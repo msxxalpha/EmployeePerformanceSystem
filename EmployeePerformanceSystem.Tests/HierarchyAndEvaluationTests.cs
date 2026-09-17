@@ -123,6 +123,9 @@ public class HierarchyAndEvaluationTests
         var (db, service) = CreateDb();
         AddMasterData(db);
         db.Employees.Add(new Employee { Id=1, PersonnelNo="1", FullName="1", PositionId=1, UnitId=1, IsActive=true, IsEvaluator=true });
+        db.Questions.AddRange(
+            new Question { Id=1, PositionId=1, Text="Q1", MaxScore=10, IsActive=true },
+            new Question { Id=2, PositionId=1, Text="Q2", MaxScore=10, IsActive=true });
         db.Evaluations.Add(new Evaluation { Id=7, PeriodId=1, EmployeeId=1, EvaluatorId=1, OriginalEvaluatorId=1 });
         db.Scores.AddRange(
             new EvaluationScore { Id=1, EvaluationId=7, QuestionId=1, Score=7 },
