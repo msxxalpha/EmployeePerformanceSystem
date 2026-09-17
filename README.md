@@ -1,5 +1,20 @@
 # Indamin Employee Performance System
 
-This repository contains the Indamin monthly employee performance evaluation system.
+سامانه ارزیابی عملکرد ماهانه کارکنان شرکت ایندامین.
 
-The project was migrated from the `IndaminEmployeePerformance` folder of the previous repository. Development will continue here.
+## Technology
+- ASP.NET Core / .NET 10 MVC
+- Entity Framework Core 10 + SQL Server
+- ClosedXML for Excel import/export
+- Persian RTL UI and Jalali date support
+
+## Main capabilities
+- Employee master data and Excel import
+- Organizational hierarchy and evaluator roles
+- Monthly evaluation periods with editable windows
+- Full subordinate-tree evaluation
+- Upper-level evaluator review and score override
+- Score and evaluator change history
+- Reports and Excel export
+
+Development continues exclusively in this repository.
