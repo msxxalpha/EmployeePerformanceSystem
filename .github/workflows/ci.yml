@@ -1,0 +1,52 @@
+name: Build-Test-Publish
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Restore
+        run: dotnet restore Indamin.Performance.Web.csproj
+      - name: Build
+        run: dotnet build Indamin.Performance.Web.csproj -c Release --no-restore
+      - name: Test
+        run: dotnet test EmployeePerformanceSystem.Tests/EmployeePerformanceSystem.Tests.csproj -c Release --no-restore --verbosity normal
+      - name: Publish self-contained
+        run: dotnet publish Indamin.Performance.Web.csproj -c Release -r win-x64 --self-contained true -o publish
+      - name: Package deployment artifact
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path package/Database | Out-Null
+          Copy-Item publish package/Application -Recurse
+          Copy-Item Database/* package/Database -Force
+          @'
+          # Employee Performance System - Deployment Package
+
+          ## IIS
+          1. Install the ASP.NET Core Hosting Bundle 10.x on the Windows Server. IIS uses the ASP.NET Core Module; Visual Studio is not required.
+          2. Copy the `Application` folder to the IIS site directory.
+          3. Set the IIS site physical path to `Application` and use an Application Pool with `No Managed Code`.
+          4. Edit `Application/appsettings.json` and set the SQL Server connection string.
+          5. Run `Database/001_initial.sql` against the target SQL Server database.
+          6. Browse to the site. Initial administrator credentials are documented in the deployment instructions; change them immediately after first login.
+
+          ## Employee login
+          After Excel import, every active employee receives an account with:
+          - Username: Personnel Number
+          - Password: National ID
+
+          Evaluators retain the evaluation menu; ordinary employees receive read-only access to their own dashboard.
+          '@ | Set-Content package/INSTALL.md -Encoding UTF8
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EmployeePerformanceSystem-win-x64
+          path: package
+          if-no-files-found: error
