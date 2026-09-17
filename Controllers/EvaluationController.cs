@@ -112,7 +112,8 @@ public class EvaluationController(AppDbContext db, PerformanceService ps, ExcelS
         }
         ev.Status = EvaluationStatus.Submitted;
         ev.UpdatedAt = DateTime.UtcNow;
-        db.AuditLogs.Add(new AuditLog { Action = isNew ? "EvaluationCreated" : "EvaluationUpdated", Entity = "Evaluation", EntityId = isNew ? "new" : ev.Id.ToString(), Details = $"EmployeeId={employee.Id};EvaluatorId={actor};Total={ev.Scores.Sum(x => x.Score)};Max={qs.Sum(x => x.MaxScore)}", UserId = actor });
+        int? appUserId = int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var parsedUserId) ? parsedUserId : null;
+        db.AuditLogs.Add(new AuditLog { Action = isNew ? "EvaluationCreated" : "EvaluationUpdated", Entity = "Evaluation", EntityId = isNew ? "new" : ev.Id.ToString(), Details = $"EmployeeId={employee.Id};EvaluatorId={actor};Total={ev.Scores.Sum(x => x.Score)};Max={qs.Sum(x => x.MaxScore)}", UserId = appUserId });
         await db.SaveChangesAsync();
         return RedirectToAction(nameof(Index));
     }
