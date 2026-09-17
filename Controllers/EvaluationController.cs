@@ -81,6 +81,8 @@ public class EvaluationController(AppDbContext db, PerformanceService ps, ExcelS
             db.Evaluations.Add(ev);
         }
         else if (!await ps.CanReviewEvaluation(actor, ev!)) return Forbid();
+
+        var evaluation = ev ?? throw new InvalidOperationException("Evaluation could not be initialized.");
         var qs = await Questions(employee.PositionId);
         foreach (var q in qs)
         {
@@ -91,29 +93,29 @@ public class EvaluationController(AppDbContext db, PerformanceService ps, ExcelS
                 continue;
             }
             var comment = m.Comments.TryGetValue(q.Id, out var c) ? c?.Trim() : null;
-            var old = ev!.Scores.FirstOrDefault(x => x.QuestionId == q.Id);
+            var old = evaluation.Scores.FirstOrDefault(x => x.QuestionId == q.Id);
             if (old == null)
-                ev.Scores.Add(new EvaluationScore { QuestionId = q.Id, Score = score, Comment = comment });
+                evaluation.Scores.Add(new EvaluationScore { QuestionId = q.Id, Score = score, Comment = comment });
             else if (old.Score != score || old.Comment != comment)
             {
-                db.ScoreHistory.Add(new EvaluationScoreHistory { EvaluationId = ev.Id, QuestionId = q.Id, OldScore = old.Score, NewScore = score, ChangedBy = actor, Reason = ev.EvaluatorId == actor ? "اصلاح ارزیابی" : "بازنگری ارزیاب بالادست" });
+                db.ScoreHistory.Add(new EvaluationScoreHistory { EvaluationId = evaluation.Id, QuestionId = q.Id, OldScore = old.Score, NewScore = score, ChangedBy = actor, Reason = evaluation.EvaluatorId == actor ? "اصلاح ارزیابی" : "بازنگری ارزیاب بالادست" });
                 old.Score = score; old.Comment = comment; old.UpdatedAt = DateTime.UtcNow;
             }
         }
         if (!ModelState.IsValid)
         {
-            var history = ev.Id > 0 ? await History(ev.Id) : new List<HistoryRow>();
-            return View("Form", new FormVm(p, employee, qs, ev, true, "برخی امتیازها نامعتبر هستند؛ لطفاً موارد مشخص‌شده را اصلاح کنید.", history));
+            var history = evaluation.Id > 0 ? await History(evaluation.Id) : new List<HistoryRow>();
+            return View("Form", new FormVm(p, employee, qs, evaluation, true, "برخی امتیازها نامعتبر هستند؛ لطفاً موارد مشخص‌شده را اصلاح کنید.", history));
         }
-        if (ev!.EvaluatorId != actor)
+        if (evaluation.EvaluatorId != actor)
         {
-            db.EvaluatorHistory.Add(new EvaluatorChangeHistory { EvaluationId = ev.Id, PreviousEvaluatorId = ev.EvaluatorId, NewEvaluatorId = actor, ChangedBy = actor, Reason = "بازنگری ارزیاب بالادست" });
-            ev.EvaluatorId = actor;
+            db.EvaluatorHistory.Add(new EvaluatorChangeHistory { EvaluationId = evaluation.Id, PreviousEvaluatorId = evaluation.EvaluatorId, NewEvaluatorId = actor, ChangedBy = actor, Reason = "بازنگری ارزیاب بالادست" });
+            evaluation.EvaluatorId = actor;
         }
-        ev.Status = EvaluationStatus.Submitted;
-        ev.UpdatedAt = DateTime.UtcNow;
+        evaluation.Status = EvaluationStatus.Submitted;
+        evaluation.UpdatedAt = DateTime.UtcNow;
         int? appUserId = int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var parsedUserId) ? parsedUserId : null;
-        db.AuditLogs.Add(new AuditLog { Action = isNew ? "EvaluationCreated" : "EvaluationUpdated", Entity = "Evaluation", EntityId = isNew ? "new" : ev.Id.ToString(), Details = $"EmployeeId={employee.Id};EvaluatorId={actor};Total={ev.Scores.Sum(x => x.Score)};Max={qs.Sum(x => x.MaxScore)}", UserId = appUserId });
+        db.AuditLogs.Add(new AuditLog { Action = isNew ? "EvaluationCreated" : "EvaluationUpdated", Entity = "Evaluation", EntityId = isNew ? "new" : evaluation.Id.ToString(), Details = $"EmployeeId={employee.Id};EvaluatorId={actor};Total={evaluation.Scores.Sum(x => x.Score)};Max={qs.Sum(x => x.MaxScore)}", UserId = appUserId });
         await db.SaveChangesAsync();
         return RedirectToAction(nameof(Index));
     }
