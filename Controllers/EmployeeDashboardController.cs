@@ -19,7 +19,7 @@ public class EmployeeDashboardController(AppDbContext db) : Controller
         var evaluations = await db.Evaluations.AsNoTracking().Where(x => x.EmployeeId == employeeId).Include(x => x.Period).Include(x => x.Scores).ToListAsync();
         var questionIds = evaluations.SelectMany(x => x.Scores).Select(x => x.QuestionId).Distinct().ToList();
         var questions = await db.Questions.AsNoTracking().Where(x => questionIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id);
-        var rows = evaluations.OrderByDescending(x => x.Period.StartAt).Select(x => new EvaluationSummaryVm(x.PeriodId, x.Period.Title, PerformanceService.ToJalali(x.Period.StartAt), x.Scores.Sum(s => s.Score), x.Scores.Sum(s => questions.TryGetValue(s.QuestionId, out var q) ? q.MaxScore : 0), x.Status.ToString())).ToList();
+        var rows = evaluations.OrderByDescending(x => x.Period!.StartAt).Select(x => new EvaluationSummaryVm(x.PeriodId, x.Period!.Title, PerformanceService.ToJalali(x.Period.StartAt), x.Scores.Sum(s => s.Score), x.Scores.Sum(s => questions.TryGetValue(s.QuestionId, out var q) ? q.MaxScore : 0), x.Status.ToString())).ToList();
         var selected = periodId.HasValue ? rows.FirstOrDefault(x => x.PeriodId == periodId.Value) : rows.FirstOrDefault();
         var detail = selected == null ? null : BuildDetail(evaluations.First(x => x.PeriodId == selected.PeriodId), questions);
         var trend = rows.AsEnumerable().Reverse().Select(x => new TrendVm(x.Title, x.Percentage)).ToList();
@@ -33,7 +33,7 @@ public class EmployeeDashboardController(AppDbContext db) : Controller
     {
         var items = evaluation.Scores.OrderBy(s => questions.TryGetValue(s.QuestionId, out var q) ? q.SortOrder : int.MaxValue).Select(s => { questions.TryGetValue(s.QuestionId, out var q); return new QuestionScoreVm(q?.Text ?? "سؤال حذف‌شده", s.Score, q?.MaxScore ?? 0, q?.MaxScore > 0 ? Math.Round(s.Score / q.MaxScore * 100, 1) : 0, s.Comment); }).ToList();
         var max = items.Sum(x => x.MaxScore); var total = items.Sum(x => x.Score);
-        return new DetailVm(evaluation.Period.Title, PerformanceService.ToJalali(evaluation.Period.StartAt), total, max, max > 0 ? Math.Round(total / max * 100, 1) : 0, items);
+        return new DetailVm(evaluation.Period!.Title, PerformanceService.ToJalali(evaluation.Period.StartAt), total, max, max > 0 ? Math.Round(total / max * 100, 1) : 0, items);
     }
 
     private static List<TrendVm> BuildQuestionTrend(List<Evaluation> evaluations, Dictionary<int, Question> questions)
