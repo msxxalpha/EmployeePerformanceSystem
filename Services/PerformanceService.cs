@@ -18,10 +18,10 @@ public class PerformanceService(AppDbContext db)
 
     public async Task<List<Employee>> GetSubordinates(int evaluatorId)
     {
-        // Hierarchy authorization must not depend on Position/Unit Include joins.
-        // Those are required FKs in production and an Include can hide employees when
-        // test data or a temporarily incomplete master-data load lacks the principal row.
+        // Authorization scope is derived only from the active Supervisor graph.
+        // Position/Unit are optional enrichments and must never determine hierarchy membership.
         var employees = await db.Employees.Where(x=>x.IsActive).AsNoTracking().ToListAsync();
+        var byId = employees.ToDictionary(x=>x.Id);
         var bySupervisor=employees.Where(x=>x.SupervisorId.HasValue).GroupBy(x=>x.SupervisorId!.Value).ToDictionary(g=>g.Key,g=>g.ToList());
         var result=new List<Employee>();
         var queue=new Queue<int>();
@@ -34,11 +34,12 @@ public class PerformanceService(AppDbContext db)
             foreach(var child in children)
             {
                 if(!visited.Add(child.Id))continue;
+                // A cyclic reporting chain is invalid authorization data; exclude that branch.
+                if(IsCyclicChain(child.Id, byId))continue;
                 result.Add(child);
                 queue.Enqueue(child.Id);
             }
         }
-
         if(result.Count>0)
         {
             var positionIds=result.Select(x=>x.PositionId).Distinct().ToList();
@@ -52,6 +53,20 @@ public class PerformanceService(AppDbContext db)
             }
         }
         return result.OrderBy(x=>x.FullName).ToList();
+    }
+
+    private static bool IsCyclicChain(int employeeId, Dictionary<int,Employee> byId)
+    {
+        var seen=new HashSet<int>();
+        var current=employeeId;
+        while(byId.TryGetValue(current,out var employee)&&employee.SupervisorId.HasValue)
+        {
+            if(!seen.Add(current))return true;
+            var supervisorId=employee.SupervisorId.Value;
+            if(!byId.ContainsKey(supervisorId))return false;
+            current=supervisorId;
+        }
+        return false;
     }
 
     public async Task<List<Employee>> GetDirectSubordinates(int evaluatorId)=>(await GetSubordinates(evaluatorId)).Where(x=>x.SupervisorId==evaluatorId).ToList();
