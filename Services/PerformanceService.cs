@@ -15,7 +15,45 @@ public class PerformanceService(AppDbContext db)
     public static string ToJalali(DateTime d){var pc=new PersianCalendar();return $"{pc.GetYear(d):0000}/{pc.GetMonth(d):00}/{pc.GetDayOfMonth(d):00}";}
     public async Task<EvaluationPeriod?> CurrentPeriod()=>await db.Periods.Where(x=>x.IsOpen&&x.StartAt<=DateTime.Now).OrderByDescending(x=>x.StartAt).FirstOrDefaultAsync();
     public Task<bool> CanEdit(EvaluationPeriod p)=>Task.FromResult(p.IsOpen&&DateTime.Now>=p.StartAt&&DateTime.Now<=p.EndAt);
-    public async Task<List<Employee>> GetSubordinates(int evaluatorId){var employees=await db.Employees.Where(x=>x.IsActive).Include(x=>x.Position).Include(x=>x.Unit).AsNoTracking().ToListAsync();var bySupervisor=employees.Where(x=>x.SupervisorId.HasValue).GroupBy(x=>x.SupervisorId!.Value).ToDictionary(g=>g.Key,g=>g.ToList());var result=new List<Employee>();var queue=new Queue<int>();queue.Enqueue(evaluatorId);var visited=new HashSet<int>{evaluatorId};while(queue.Count>0){var managerId=queue.Dequeue();if(!bySupervisor.TryGetValue(managerId,out var children))continue;foreach(var child in children){if(!visited.Add(child.Id))continue;result.Add(child);queue.Enqueue(child.Id);}}return result.OrderBy(x=>x.FullName).ToList();}
+
+    public async Task<List<Employee>> GetSubordinates(int evaluatorId)
+    {
+        // Hierarchy authorization must not depend on Position/Unit Include joins.
+        // Those are required FKs in production and an Include can hide employees when
+        // test data or a temporarily incomplete master-data load lacks the principal row.
+        var employees = await db.Employees.Where(x=>x.IsActive).AsNoTracking().ToListAsync();
+        var bySupervisor=employees.Where(x=>x.SupervisorId.HasValue).GroupBy(x=>x.SupervisorId!.Value).ToDictionary(g=>g.Key,g=>g.ToList());
+        var result=new List<Employee>();
+        var queue=new Queue<int>();
+        queue.Enqueue(evaluatorId);
+        var visited=new HashSet<int>{evaluatorId};
+        while(queue.Count>0)
+        {
+            var managerId=queue.Dequeue();
+            if(!bySupervisor.TryGetValue(managerId,out var children))continue;
+            foreach(var child in children)
+            {
+                if(!visited.Add(child.Id))continue;
+                result.Add(child);
+                queue.Enqueue(child.Id);
+            }
+        }
+
+        if(result.Count>0)
+        {
+            var positionIds=result.Select(x=>x.PositionId).Distinct().ToList();
+            var unitIds=result.Select(x=>x.UnitId).Distinct().ToList();
+            var positions=await db.Positions.Where(x=>positionIds.Contains(x.Id)).AsNoTracking().ToDictionaryAsync(x=>x.Id);
+            var units=await db.OrgUnits.Where(x=>unitIds.Contains(x.Id)).AsNoTracking().ToDictionaryAsync(x=>x.Id);
+            foreach(var employee in result)
+            {
+                employee.Position=positions.GetValueOrDefault(employee.PositionId);
+                employee.Unit=units.GetValueOrDefault(employee.UnitId);
+            }
+        }
+        return result.OrderBy(x=>x.FullName).ToList();
+    }
+
     public async Task<List<Employee>> GetDirectSubordinates(int evaluatorId)=>(await GetSubordinates(evaluatorId)).Where(x=>x.SupervisorId==evaluatorId).ToList();
     public async Task<bool> CanEvaluate(int evaluatorId,int employeeId)=>evaluatorId!=employeeId&&(await GetSubordinates(evaluatorId)).Any(x=>x.Id==employeeId);
     public async Task<bool> CanReviewEvaluation(int actorId,Evaluation ev){if(!await IsEvaluator(actorId))return false;if(actorId==ev.EvaluatorId)return true;return await IsAncestor(actorId,ev.EvaluatorId);}
