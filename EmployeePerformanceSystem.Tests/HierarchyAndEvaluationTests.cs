@@ -27,8 +27,8 @@ public class HierarchyAndEvaluationTests
             new Employee { Id=3, PersonnelNo="C", FullName="C", PositionId=1, UnitId=1, SupervisorId=2 },
             new Employee { Id=4, PersonnelNo="D", FullName="D", PositionId=1, UnitId=1, SupervisorId=3 });
         await db.SaveChangesAsync();
-        var ids = await service.GetSubordinates(1);
-        Assert.Equal(new[]{2,3,4}, ids.OrderBy(x=>x.Id).Select(x=>x.Id));
+        var ids = (await service.GetSubordinates(1)).OrderBy(x=>x.Id).Select(x=>x.Id).ToArray();
+        Assert.Equal(new[]{2,3,4}, ids);
     }
 
     [Fact]
