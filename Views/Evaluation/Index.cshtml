@@ -1,0 +1,4 @@
+@model List<Indamin.Performance.Controllers.EvaluationController.Row>
+@{ ViewData["Title"] = "ارزیابی‌های من"; }
+<div class="d-flex justify-content-between align-items-center mb-3"><h2>کارکنان تحت پوشش</h2><a class="btn btn-outline-primary" href="/Evaluation/ExportMyList">خروجی Excel</a></div>
+<div class="table-responsive"><table class="table table-hover" data-sortable><thead><tr><th>نام</th><th>پرسنلی</th><th>رده پستی</th><th>واحد</th><th>ارزیاب جاری</th><th>امتیاز</th><th>درصد</th><th>وضعیت</th><th></th></tr></thead><tbody>@foreach(var x in Model){<tr><td>@x.Name</td><td>@x.PersonnelNo</td><td>@x.Position</td><td>@x.Unit</td><td>@x.CurrentEvaluator</td><td>@x.Total / @x.Max</td><td>@x.Percentage%</td><td>@x.Status</td><td><a class="btn btn-sm btn-main" href="/Evaluation/Form?id=@x.Id">ارزیابی / مشاهده</a></td></tr>}</tbody></table></div>
