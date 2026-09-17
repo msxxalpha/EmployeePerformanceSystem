@@ -1,0 +1,34 @@
+@model Indamin.Performance.Controllers.EmployeeDashboardController.DashboardVm
+@{ ViewData["Title"] = "داشبورد عملکرد من"; var d = Model.SelectedDetail; }
+<div class="dashboard-head d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+  <div><div class="eyebrow">داشبورد شخصی عملکرد</div><h2 class="fw-bold mb-1">سلام، @Model.Name</h2><div class="text-muted">@Model.Position · @Model.Unit · پرسنلی @Model.PersonnelNo</div></div>
+  <form method="get" class="period-picker"><label>دوره ارزیابی</label><select name="periodId" class="form-select" onchange="this.form.submit()"><option value="">آخرین دوره دارای ارزیابی</option>@foreach(var p in Model.Periods){<option value="@p.Id" selected="@(Model.SelectedPeriodId==p.Id)">@p.Title @(!p.HasEvaluation ? "(بدون ارزیابی)" : "")</option>}</select></form>
+</div>
+@if(d == null){<div class="card p-5 text-center empty-state"><div class="display-6">📊</div><h4>هنوز ارزیابی‌ای برای شما ثبت نشده است</h4><p class="text-muted mb-0">پس از ثبت ارزیابی، امتیازها و روند عملکرد شما در این داشبورد نمایش داده می‌شود.</p></div>}
+else {
+<div class="row g-3 mb-4">
+ <div class="col-xl-3 col-md-6"><div class="metric-card metric-main"><span>امتیاز دوره</span><strong>@d.Percentage.ToString("0.0")٪</strong><small>@d.Score.ToString("0.##") از @d.MaxScore.ToString("0.##")</small></div></div>
+ <div class="col-xl-3 col-md-6"><div class="metric-card"><span>تعداد شاخص‌ها</span><strong>@d.Questions.Count</strong><small>شاخص ارزیابی</small></div></div>
+ <div class="col-xl-3 col-md-6"><div class="metric-card"><span>نقاط قوت</span><strong>@Model.Strengths.Count</strong><small>میانگین ۸۰٪ و بالاتر</small></div></div>
+ <div class="col-xl-3 col-md-6"><div class="metric-card"><span>قابل بهبود</span><strong>@Model.Improvements.Count</strong><small>میانگین کمتر از ۶۰٪</small></div></div>
+</div>
+<div class="row g-3 mb-4">
+ <div class="col-xl-8"><div class="card chart-card"><div class="card-title-row"><div><h5>روند امتیاز عملکرد</h5><span>مقایسه دوره‌های ثبت‌شده</span></div></div><div class="chart-wrap"><canvas id="trendChart"></canvas></div></div></div>
+ <div class="col-xl-4"><div class="card chart-card"><div class="card-title-row"><div><h5>وضعیت دوره منتخب</h5><span>@d.Title · @d.Date</span></div></div><div class="gauge"><div class="gauge-value">@d.Percentage.ToString("0.0")٪</div><div class="gauge-caption">امتیاز کل</div></div></div></div>
+</div>
+<div class="row g-3 mb-4">
+ <div class="col-xl-7"><div class="card chart-card"><div class="card-title-row"><div><h5>عملکرد به تفکیک سؤال</h5><span>میانگین درصد کسب‌شده در دوره‌های دارای امتیاز</span></div></div><div class="chart-wrap tall"><canvas id="questionChart"></canvas></div></div></div>
+ <div class="col-xl-5"><div class="card"><div class="card-title-row"><div><h5>نقاط قوت</h5><span>شاخص‌هایی با عملکرد پایدارتر</span></div></div><div class="area-list">@if(!Model.Strengths.Any()){<div class="muted-box">مورد مشخصی در این آستانه ثبت نشده است.</div>} @foreach(var x in Model.Strengths){<div class="area-row"><div><span>@x.Label</span><b>@x.Percentage.ToString("0.0")٪</b></div><div class="progress"><div class="progress-bar" style="width:@Math.Min(100,x.Percentage)%"></div></div></div>}</div></div></div>
+</div>
+<div class="row g-3 mb-4">
+ <div class="col-xl-5"><div class="card"><div class="card-title-row"><div><h5>نقاط قابل بهبود</h5><span>اولویت‌هایی برای گفت‌وگوی توسعه‌ای</span></div></div><div class="area-list">@if(!Model.Improvements.Any()){<div class="muted-box">در این آستانه موردی شناسایی نشد.</div>} @foreach(var x in Model.Improvements){<div class="area-row improvement"><div><span>@x.Label</span><b>@x.Percentage.ToString("0.0")٪</b></div><div class="progress"><div class="progress-bar" style="width:@Math.Min(100,x.Percentage)%"></div></div></div>}</div></div></div>
+ <div class="col-xl-7"><div class="card"><div class="card-title-row"><div><h5>جزئیات ارزیابی @d.Title</h5><span>نمایش شفاف امتیاز هر سؤال و توضیحات ثبت‌شده</span></div></div><div class="table-responsive"><table class="table align-middle modern-table"><thead><tr><th>شاخص</th><th>امتیاز</th><th>درصد</th><th>توضیح</th></tr></thead><tbody>@foreach(var q in d.Questions){<tr><td>@q.Text</td><td>@q.Score / @q.MaxScore</td><td><span class="score-pill">@q.Percentage.ToString("0.0")٪</span></td><td class="text-muted">@(string.IsNullOrWhiteSpace(q.Comment) ? "—" : q.Comment)</td></tr>}</tbody></table></div></div></div>
+</div>
+<div class="card"><div class="card-title-row"><div><h5>سوابق دوره‌های ارزیابی</h5><span>تاریخچه امتیازهای ثبت‌شده شما</span></div></div><div class="table-responsive"><table class="table modern-table"><thead><tr><th>دوره</th><th>تاریخ</th><th>امتیاز</th><th>درصد</th><th>وضعیت</th></tr></thead><tbody>@foreach(var r in Model.Evaluations){<tr><td>@r.Title</td><td>@r.Date</td><td>@r.Score / @r.MaxScore</td><td><b>@r.Percentage.ToString("0.0")٪</b></td><td>@r.Status</td></tr>}</tbody></table></div></div>
+}
+@section Scripts {<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script><script>
+const trendLabels=@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Trend.Select(x=>x.Label))); const trendValues=@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Trend.Select(x=>x.Percentage)));
+const qLabels=@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.QuestionTrend.Select(x=>x.Label))); const qValues=@Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.QuestionTrend.Select(x=>x.Percentage)));
+new Chart(document.getElementById('trendChart'),{type:'line',data:{labels:trendLabels,datasets:[{label:'درصد عملکرد',data:trendValues,tension:.35,fill:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{min:0,max:100,ticks:{callback:v=>v+'٪'}}}}});
+new Chart(document.getElementById('questionChart'),{type:'bar',data:{labels:qLabels,datasets:[{label:'میانگین درصد',data:qValues,borderRadius:7}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{min:0,max:100,ticks:{callback:v=>v+'٪'}}}}});
+</script>}
