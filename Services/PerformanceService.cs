@@ -22,6 +22,7 @@ public class PerformanceService(AppDbContext db)
         // Position/Unit are optional enrichments and must never determine hierarchy membership.
         var employees = await db.Employees.Where(x=>x.IsActive).AsNoTracking().ToListAsync();
         var byId = employees.ToDictionary(x=>x.Id);
+        var cyclicIds = FindCyclicNodes(byId);
         var bySupervisor=employees.Where(x=>x.SupervisorId.HasValue).GroupBy(x=>x.SupervisorId!.Value).ToDictionary(g=>g.Key,g=>g.ToList());
         var result=new List<Employee>();
         var queue=new Queue<int>();
@@ -30,12 +31,13 @@ public class PerformanceService(AppDbContext db)
         while(queue.Count>0)
         {
             var managerId=queue.Dequeue();
+            if(cyclicIds.Contains(managerId))continue;
             if(!bySupervisor.TryGetValue(managerId,out var children))continue;
             foreach(var child in children)
             {
                 if(!visited.Add(child.Id))continue;
                 // A cyclic reporting chain is invalid authorization data; exclude that branch.
-                if(IsCyclicChain(child.Id, byId))continue;
+                if(cyclicIds.Contains(child.Id))continue;
                 result.Add(child);
                 queue.Enqueue(child.Id);
             }
@@ -55,18 +57,36 @@ public class PerformanceService(AppDbContext db)
         return result.OrderBy(x=>x.FullName).ToList();
     }
 
-    private static bool IsCyclicChain(int employeeId, Dictionary<int,Employee> byId)
+    private static HashSet<int> FindCyclicNodes(Dictionary<int,Employee> byId)
     {
-        var seen=new HashSet<int>();
-        var current=employeeId;
-        while(byId.TryGetValue(current,out var employee)&&employee.SupervisorId.HasValue)
+        // Functional graph cycle detection: each employee has at most one SupervisorId.
+        // Mark every node that belongs to, or leads into, a cycle so no invalid branch
+        // can become part of an authorization scope.
+        var cyclic = new HashSet<int>();
+        var state = new Dictionary<int,byte>(); // 0=unvisited, 1=active path, 2=resolved
+        foreach(var start in byId.Keys)
         {
-            if(!seen.Add(current))return true;
-            var supervisorId=employee.SupervisorId.Value;
-            if(!byId.ContainsKey(supervisorId))return false;
-            current=supervisorId;
+            if(state.TryGetValue(start,out var known) && known!=0)continue;
+            var path=new List<int>();
+            var index=new Dictionary<int,int>();
+            var current=start;
+            while(byId.ContainsKey(current) && (!state.TryGetValue(current,out var s) || s==0))
+            {
+                if(index.TryGetValue(current,out var cycleStart))
+                {
+                    for(var i=cycleStart;i<path.Count;i++)cyclic.Add(path[i]);
+                    break;
+                }
+                index[current]=path.Count;
+                path.Add(current);
+                state[current]=1;
+                var supervisorId=byId[current].SupervisorId;
+                if(!supervisorId.HasValue || !byId.ContainsKey(supervisorId.Value))break;
+                current=supervisorId.Value;
+            }
+            foreach(var node in path)state[node]=2;
         }
-        return false;
+        return cyclic;
     }
 
     public async Task<List<Employee>> GetDirectSubordinates(int evaluatorId)=>(await GetSubordinates(evaluatorId)).Where(x=>x.SupervisorId==evaluatorId).ToList();
