@@ -60,8 +60,8 @@ public class PerformanceService(AppDbContext db)
     private static HashSet<int> FindCyclicNodes(Dictionary<int,Employee> byId)
     {
         // Functional graph cycle detection: each employee has at most one SupervisorId.
-        // Mark every node that belongs to, or leads into, a cycle so no invalid branch
-        // can become part of an authorization scope.
+        // Mark every node that belongs to a cycle so no invalid branch can become part
+        // of an authorization scope.
         var cyclic = new HashSet<int>();
         var state = new Dictionary<int,byte>(); // 0=unvisited, 1=active path, 2=resolved
         foreach(var start in byId.Keys)
@@ -70,11 +70,14 @@ public class PerformanceService(AppDbContext db)
             var path=new List<int>();
             var index=new Dictionary<int,int>();
             var current=start;
-            while(byId.ContainsKey(current) && (!state.TryGetValue(current,out var s) || s==0))
+            while(byId.ContainsKey(current))
             {
-                if(index.TryGetValue(current,out var cycleStart))
+                if(state.TryGetValue(current,out var s))
                 {
-                    for(var i=cycleStart;i<path.Count;i++)cyclic.Add(path[i]);
+                    if(s==1 && index.TryGetValue(current,out var cycleStart))
+                    {
+                        for(var i=cycleStart;i<path.Count;i++)cyclic.Add(path[i]);
+                    }
                     break;
                 }
                 index[current]=path.Count;
