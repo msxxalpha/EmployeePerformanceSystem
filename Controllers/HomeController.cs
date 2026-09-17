@@ -1,12 +1,9 @@
-using System.Security.Claims;
-using Indamin.Performance.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 namespace Indamin.Performance.Controllers;
 
 [Authorize]
-public class HomeController(AppDbContext db) : Controller
+public class HomeController : Controller
 {
     public IActionResult Index()
     {
