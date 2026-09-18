@@ -1,103 +1,60 @@
 # راهنمای نصب سامانه ارزیابی عملکرد ایندامین
 
-این راهنما برای استقرار نسخه Windows x64 روی Windows Server و IIS تهیه شده است.
+## نسخه آزمایشی اولیه
+این پروژه به صورت Self-contained win-x64 منتشر می‌شود؛ برای اجرای خود برنامه Visual Studio یا .NET Runtime روی سرور لازم نیست. برای IIS نصب ASP.NET Core Hosting Bundle 10.x / ANCM لازم است.
 
-## 1. پیش‌نیازها
+## 1. استقرار روی IIS
+1. فایل ZIP انتشار را استخراج کنید؛ دو پوشه Application و Database و فایل INSTALL.md داخل آن است.
+2. پوشه Application را مثلاً در C:\inetpub\EmployeePerformanceSystem قرار دهید.
+3. در IIS یک Application Pool با Managed Runtime Version = No Managed Code و Pipeline = Integrated بسازید.
+4. Website را با Physical Path روی پوشه Application تنظیم کنید.
+5. Connection String را در Application/appsettings.json تنظیم کنید. کلید آن در این نسخه Default است.
+6. یک Database خالی مانند IndaminPerformance بسازید.
+7. در حالت Database خالی، برنامه در اولین اجرا با EnsureCreated جداول را می‌سازد. اجرای Database/001_initial.sql اختیاری است.
+8. اگر Database متعلق به نسخه‌های قبلی همین پروژه است، 001_initial.sql را اجرا نکنید؛ برنامه SchemaVersions را کنترل و Database/002_upgrade.sql را به‌صورت تراکنشی اجرا می‌کند.
+9. سایت را Start کنید و Login را باز کنید.
 
-- Windows Server 2019/2022/2025 x64
-- IIS 10 یا بالاتر
-- SQL Server 2019 یا بالاتر (یا نسخه سازگار با EF Core/SQL Server provider پروژه)
-- دسترسی مدیریتی برای ایجاد Application Pool و Database
-- دسترسی شبکه‌ای IIS Server به SQL Server
+## 2. ورود
+- مدیر اولیه: admin / مقدار InitialAdminPassword
+- کارمند: شماره پرسنلی / کد ملی اولیه
+- رمز کارکنان به صورت Hash در Database ذخیره می‌شود.
+- کارمند عادی فقط داشبورد شخصی خود را می‌بیند.
+- کارمند دارای IsEvaluator علاوه بر داشبورد شخصی، امکانات ارزیابی زیرمجموعه را دارد.
 
-> نسخه CI فعلی به صورت **self-contained win-x64** منتشر می‌شود؛ بنابراین برای اجرای خود برنامه به نصب .NET Runtime روی سرور نیاز نیست. IIS همچنان به ASP.NET Core Module (ANCM) نیاز دارد.
+## 3. ترتیب راه‌اندازی
+1. ساخت واحدهای سازمانی
+2. تعریف رده‌های پستی
+3. تعریف سؤال در بانک سؤال
+4. اتصال سؤال به رده پستی با سقف امتیاز و ترتیب
+5. ورود کارکنان از Excel
+6. کنترل IsEvaluator و SupervisorId
+7. تعریف دوره و بازه ارزیابی با تقویم شمسی
+8. انجام ارزیابی
 
-## 2. دریافت بسته انتشار
+## 4. منطق ارزیابی
+- SupervisorId محدوده ارزیابی را در کل درخت سازمانی تعیین می‌کند.
+- ارزیاب بالادست که خودش ارزیاب است می‌تواند کل subtree را مشاهده و ارزیابی کند.
+- هنگام بازنگری ارزیابی ارزیاب پایین‌دست، OriginalEvaluatorId حفظ می‌شود.
+- تغییر امتیازها در EvaluationScoreHistory و تغییر ارزیاب در EvaluatorChangeHistory ثبت می‌شود.
+- سقف هر سؤال از PositionQuestions خوانده و در EvaluationScores به عنوان snapshot ذخیره می‌شود.
+- امتیاز نهایی دوره از جمع Score سؤال‌های همان ارزیابی و سقف نهایی از جمع MaxScore همان snapshot محاسبه می‌شود.
+- بعد از پایان بازه، فرم‌ها فقط قابل مشاهده هستند.
 
-از GitHub Actions، آخرین artifact با نام `EmployeePerformanceSystem-win-x64` را دریافت و ZIP را در یک مسیر ثابت مانند زیر استخراج کنید:
+## 5. کنترل اولیه
+- [ ] Login Admin
+- [ ] ایجاد دوره با تاریخ شمسی
+- [ ] ایجاد رده پستی
+- [ ] تعریف سؤال با کد، عنوان، حوزه و توضیحات
+- [ ] اتصال سؤال به رده با سقف امتیاز
+- [ ] Import چهار کارمند نمونه A→B→C→D از Excel
+- [ ] Login B و ارزیابی C
+- [ ] Login A و بازنگری C
+- [ ] بررسی ScoreHistory و EvaluatorChangeHistory
+- [ ] Login C و مشاهده فقط داشبورد C
+- [ ] بررسی گزارش مدیریتی و Export Excel
 
-`C:\inetpub\EmployeePerformanceSystem`
+## 6. نکات امنیتی و عملیاتی
+رمز اولیه Admin را پیش از بهره‌برداری واقعی تغییر دهید، Secretهای SQL را در Git قرار ندهید، Backup/Restore SQL Server را آزمایش کنید و قبل از جایگزینی نسخه روی IIS از Database و configuration نسخه پشتیبان بگیرید.
 
-## 3. ایجاد Database
-
-1. در SQL Server یک Database خالی ایجاد کنید، مثلاً `IndaminPerformance`.
-2. Connection String را متناسب با SQL Server خود تنظیم کنید.
-3. فایل‌های موجود در پوشه `Database` یا migrationهای پروژه را مطابق `MIGRATION.md` اجرا کنید.
-4. پس از ایجاد جداول، وجود جداول اصلی شامل Employees، AppUsers، EvaluationPeriods، Questions، Evaluations، EvaluationScores، EvaluationScoreHistory، EvaluatorChangeHistory و AuditLogs را کنترل کنید.
-
-## 4. تنظیم Connection String و رمز Admin
-
-تنظیمات حساس را ترجیحاً در `appsettings.Production.json` یا Environment Variable/Secret سرور قرار دهید و رمز واقعی را در Git commit نکنید.
-
-نمونه ساختار:
-
-```json
-{
-  "ConnectionStrings": {
-    "DefaultConnection": "Server=SQLSERVER;Database=IndaminPerformance;Trusted_Connection=True;TrustServerCertificate=True;"
-  },
-  "InitialAdminPassword": "CHANGE-THIS-BEFORE-FIRST-USE"
-}
-```
-
-در محیط عملیاتی، مقدار `InitialAdminPassword` باید یک رمز موقت قوی باشد و پس از اولین ورود مطابق سیاست امنیتی سازمان تغییر کند.
-
-اگر تنظیم رمز اولیه Admin وجود نداشته باشد، برنامه نباید با یک رمز پیش‌فرض ناامن راه‌اندازی شود.
-
-## 5. نصب IIS
-
-1. در Server Manager نقش **Web Server (IIS)** را نصب کنید.
-2. **ASP.NET Core Module / Hosting Bundle** مورد نیاز محیط IIS را نصب کنید. حتی در حالت self-contained، IIS برای میزبانی ASP.NET Core به ANCM نیاز دارد.
-3. یک Application Pool جدید بسازید:
-   - Name: `IndaminPerformance`
-   - Managed Runtime Version: `No Managed Code`
-   - Pipeline: `Integrated`
-4. یک IIS Website بسازید و Physical Path را روی مسیر انتشار قرار دهید.
-5. Binding مورد نیاز سازمان را تعریف کنید؛ در محیط واقعی ترجیحاً HTTPS استفاده شود.
-
-## 6. دسترسی‌های فایل و SQL
-
-Identity مربوط به Application Pool باید حداقل دسترسی Read & Execute به پوشه انتشار داشته باشد.
-
-اگر از Windows Authentication برای SQL Server استفاده می‌شود، حساب سرویس IIS باید مجوز لازم روی Database داشته باشد. اگر SQL Authentication استفاده می‌شود، Secret را در فایل عمومی GitHub قرار ندهید.
-
-## 7. اولین راه‌اندازی
-
-پس از Start کردن سایت:
-
-1. صفحه Login را باز کنید.
-2. حساب Admin اولیه را با رمز تنظیم‌شده در configuration وارد کنید.
-3. اطلاعات پایه رده‌های پستی، سؤال‌ها و کارکنان را وارد کنید.
-4. برای کارکنان، شماره پرسنلی به عنوان username و کد ملی به عنوان password اولیه استفاده می‌شود؛ رمز به صورت hash در Database نگهداری می‌شود.
-5. ویژگی `IsEvaluator` و `SupervisorId` کارکنان را کنترل کنید.
-6. یک دوره ارزیابی ایجاد کنید و بازه شروع/پایان ارزیابی را تنظیم کنید.
-
-## 8. کنترل‌های قبل از بهره‌برداری
-
-- [ ] Login کارمند عادی فقط داشبورد شخصی را نمایش می‌دهد.
-- [ ] فقط `IsEvaluator=true` اجازه ورود به امکانات ارزیابی را دارد.
-- [ ] ارزیاب فقط درخت زیرمجموعه واقعی خود را مشاهده می‌کند.
-- [ ] ارزیاب بالادست می‌تواند ارزیابی ارزیاب زیرمجموعه را بازبینی کند.
-- [ ] تغییر ارزیاب در `EvaluatorChangeHistory` ثبت می‌شود.
-- [ ] تغییر امتیاز در `EvaluationScoreHistory` ثبت می‌شود.
-- [ ] `OriginalEvaluatorId` پس از بازنگری تغییر نمی‌کند.
-- [ ] مجموع امتیاز از امتیازهای جاری محاسبه می‌شود.
-- [ ] امتیاز بیشتر از سقف سؤال پذیرفته نمی‌شود.
-- [ ] خارج از بازه ارزیابی، تغییر اطلاعات ممنوع و مشاهده سابقه مجاز است.
-- [ ] کارمند غیرفعال وارد scope ارزیاب نمی‌شود.
-- [ ] چرخه در ساختار سرپرستی باعث loop یا افزایش scope نمی‌شود.
-- [ ] Export/Import Excel با قالب مصوب کنترل شده است.
-- [ ] Audit Log برای عملیات مهم ایجاد/ثبت شده است.
-- [ ] Backup منظم SQL Server و تست Restore انجام شده است.
-
-## 9. نکات عملیاتی
-
-- قبل از هر تغییر عمده، از Database و فایل‌های configuration نسخه پشتیبان تهیه کنید.
-- برای ارتقای نسخه، ابتدا روی یک محیط آزمایشی Restore/Upgrade انجام شود.
-- فایل‌های `appsettings.Production.json` دارای Secret را در GitHub قرار ندهید.
-- لاگ‌های IIS و Application را در مانیتورینگ سازمان ثبت کنید.
-- زمان سرور و Time Zone را کنترل کنید؛ بازه ارزیابی بر مبنای زمان سرور برنامه بررسی می‌شود.
-
-## 10. وضعیت اعتبارسنجی CI
-
-Pipeline پروژه مراحل Restore، Build، Test، Self-contained Publish و Package را اجرا می‌کند. موفقیت این Pipeline به معنی تست عملیاتی روی IIS واقعی نیست؛ پیش از بهره‌برداری، نصب روی یک Windows Server آزمایشی و اجرای چک‌لیست بالا الزامی است.
+## 7. اعتبارسنجی
+CI پروژه Restore، Build، Test، Self-contained Publish و Package را اجرا می‌کند. موفقیت CI جایگزین تست عملی روی IIS و SQL Server سازمان نیست.
