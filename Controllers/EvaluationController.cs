@@ -3,6 +3,7 @@ using Indamin.Performance.Data;
 using Indamin.Performance.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.EntityFrameworkCore;
 
 namespace Indamin.Performance.Controllers;
