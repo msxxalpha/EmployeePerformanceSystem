@@ -5,6 +5,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: build-test-publish-main
+  cancel-in-progress: true
 jobs:
   build-test:
     runs-on: windows-latest
