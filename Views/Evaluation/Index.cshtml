@@ -1,6 +1,75 @@
-@model List<EvaluationController.Row>
-@{ ViewData["Title"]="ارزیابی کارکنان"; var period=(EvaluationPeriod?)ViewBag.Period; }
-<div class="page-header"><div><div class="eyebrow">اجرای ارزیابی</div><h2>زیرمجموعه ارزیاب</h2><p class="text-muted">تمام زیرمجموعه سلسله‌مراتبی شما در این فهرست قرار می‌گیرد.</p></div><a class="btn btn-outline-primary" href="/Evaluation/ExportMyList">خروجی Excel</a></div>
-@if(period!=null){<div class="period-banner"><div><span>دوره</span><strong>@period.Title</strong></div><div><span>بازه</span><b>@period.StartJalali تا @period.EndJalali</b></div><div><span>وضعیت</span><b>@(period.IsOpen&&DateTime.Now>=period.StartAt&&DateTime.Now<=period.EndAt?"قابل ثبت":"فقط مشاهده")</b></div></div>}
-<div class="toolbar"><input class="form-control table-search" data-table-filter="#evals" placeholder="جستجوی نام، پرسنلی، رده یا واحد..."><span class="form-hint">تعداد افراد: @Model.Count</span></div>
-<div class="table-panel"><div class="table-responsive"><table id="evals" class="table modern-table"><thead><tr><th>کارمند</th><th>پرسنلی</th><th>رده</th><th>واحد</th><th>ارزیاب جاری</th><th>امتیاز نهایی</th><th>درصد</th><th>وضعیت</th><th></th></tr></thead><tbody>@foreach(var x in Model){<tr><td class="fw-bold">@x.Name @if(x.IsEvaluator){<span class="mini-tag">ارزیاب</span>}</td><td>@x.PersonnelNo</td><td>@x.Position</td><td>@x.Unit</td><td>@x.CurrentEvaluator</td><td>@x.Total.ToString("0.##") / @x.Max.ToString("0.##")</td><td><span class="score-pill">@x.Percentage.ToString("0.0")٪</span></td><td>@x.Status</td><td><a class="btn btn-sm btn-main" href="/Evaluation/Form?id=@x.Id">@((x.Status=="ثبت نشده")?"ارزیابی":"مشاهده / بازنگری")</a></td></tr>}</tbody></table></div></div>
+@model EvaluationController.DashboardVm
+@{
+    ViewData["Title"]="داشبورد ارزیابی";
+    var selected = Model.SelectedPeriod;
+    var active = Model.ActivePeriod;
+}
+<div class="page-header">
+    <div>
+        <div class="eyebrow">مرکز ارزیابی</div>
+        <h2>داشبورد عملکرد و ارزیابی</h2>
+        <p class="text-muted">مشاهده دوره فعال، سوابق دوره‌ها، وضعیت ارزیابی زیرمجموعه و تحلیل شاخص‌ها.</p>
+    </div>
+    <div class="toolbar-actions">
+        @if(selected!=null){<a class="btn btn-outline-secondary" href="/Evaluation/ExportMyList?periodId=@selected.Id">خروجی Excel</a>}
+        @if(active!=null){<span class="status-chip status-open">دوره فعال: @active.Title</span>}
+    </div>
+</div>
+
+<div class="evaluator-period-panel">
+    <div>
+        <div class="eyebrow">دوره ارزیابی</div>
+        <h4>@(selected?.Title ?? "هیچ دوره‌ای انتخاب نشده است")</h4>
+        @if(selected!=null){<span class="muted-box">@selected.StartJalali تا @selected.EndJalali</span>}
+    </div>
+    <form method="get" class="period-select-form">
+        <label class="form-label">انتخاب دوره</label>
+        <select name="periodId" class="form-select" onchange="this.form.submit()">
+            <option value="">@(active!=null?"دوره فعال":"انتخاب دوره")</option>
+            @foreach(var p in Model.PeriodOptions){
+                <option value="@p.Id" selected="@(selected?.Id==p.Id)">
+                    @p.Title @(p.IsActive?" — فعال":" — بسته")
+                </option>
+            }
+        </select>
+    </form>
+</div>
+
+@if(Model.Message!=null){<div class="empty-period-banner"><span class="banner-icon">i</span><div><strong>دوره فعال وجود ندارد</strong><p>@Model.Message</p></div></div>}
+
+@if(selected!=null)
+{
+    <div class="row g-3 mb-4">
+        <div class="col-xl-3 col-md-6"><div class="metric-card metric-main"><span>تعداد زیرمجموعه</span><strong>@Model.Employees.Count</strong><small>درخت سلسله‌مراتبی ارزیاب</small></div></div>
+        <div class="col-xl-3 col-md-6"><div class="metric-card"><span>ارزیابی ثبت‌شده</span><strong>@Model.Employees.Count(x=>x.Status!="ثبت نشده")</strong><small>در دوره منتخب</small></div></div>
+        <div class="col-xl-3 col-md-6"><div class="metric-card"><span>میانگین عملکرد</span><strong>@(Model.Employees.Count(x=>x.Max>0)?Math.Round(Model.Employees.Where(x=>x.Max>0).Average(x=>x.Percentage),1):0)٪</strong><small>درصد از سقف ارزیابی</small></div></div>
+        <div class="col-xl-3 col-md-6"><div class="metric-card"><span>ارزیابی نشده</span><strong>@Model.Employees.Count(x=>x.Status=="ثبت نشده")</strong><small>@(selected.EndAt<DateTime.Now?"دوره بسته است":"نیازمند اقدام")</small></div></div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-xl-7"><div class="card chart-card"><div class="card-title-row"><div><h5>رتبه بالاترین امتیازها</h5><span>۵ نفر با بیشترین درصد عملکرد در دوره منتخب</span></div></div>
+            @if(Model.TopPerformers.Count==0){<div class="empty-state">داده ارزیابی ثبت نشده است.</div>}else{<div class="ranking-list">@foreach(var x in Model.TopPerformers){<div class="ranking-row"><span class="rank-num">@((Model.TopPerformers.IndexOf(x)+1))</span><div class="rank-main"><b>@x.Name</b><div class="progress"><div class="progress-bar" style="width:@x.Percentage%"></div></div></div><strong>@x.Percentage.ToString("0.0")٪</strong></div>}</div>}
+        </div></div>
+        <div class="col-xl-5"><div class="card chart-card"><div class="card-title-row"><div><h5>نفرات قابل بهبود</h5><span>کمترین درصد امتیاز نهایی در دوره</span></div></div>
+            @if(Model.Improvements.Count==0){<div class="empty-state">داده ارزیابی ثبت نشده است.</div>}else{<div class="area-list">@foreach(var x in Model.Improvements){<div class="area-row improvement"><div><span>@x.Name</span><b>@x.Percentage.ToString("0.0")٪</b></div><div class="progress"><div class="progress-bar" style="width:@x.Percentage%"></div></div></div>}</div>}
+        </div></div>
+    </div>
+
+    <div class="card chart-card mb-4">
+        <div class="card-title-row"><div><h5>میانگین امتیاز به تفکیک سؤال</h5><span>میانگین درصد کسب‌شده از سقف سؤال در میان ارزیابی‌های دوره</span></div></div>
+        @if(Model.QuestionAverages.Count==0){<div class="empty-state">برای این دوره هنوز امتیازی ثبت نشده است.</div>}
+        else{
+            <div class="question-average-grid">
+            @foreach(var q in Model.QuestionAverages.Take(12)){<div class="question-average-row"><div><span>@q.Label</span><b>@q.AveragePercentage.ToString("0.0")٪</b></div><div class="progress"><div class="progress-bar" style="width:@q.AveragePercentage%"></div></div><small>@q.Responses پاسخ</small></div>}
+            </div>
+        }
+    </div>
+
+    <div class="table-panel">
+        <div class="panel-title"><div><h4>افراد زیرمجموعه در دوره منتخب</h4><span>در دوره بسته فقط مشاهده جزئیات امکان‌پذیر است؛ در دوره فعال ارزیابی و بازنگری طبق مجوز انجام می‌شود.</span></div></div>
+        <div class="toolbar"><input class="form-control" data-table-filter="#evals" placeholder="جست‌وجوی نام، پرسنلی، رده یا واحد..."><span class="form-hint">مرتب‌سازی با کلیک روی عنوان ستون</span></div>
+        <div class="table-responsive"><table id="evals" class="table modern-table"><thead><tr><th>کارمند</th><th>پرسنلی</th><th>رده</th><th>واحد</th><th>ارزیاب</th><th>امتیاز</th><th>درصد</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody>
+        @foreach(var x in Model.Employees){<tr><td class="fw-bold">@x.Name @if(x.IsEvaluator){<span class="mini-tag">ارزیاب</span>}</td><td>@x.PersonnelNo</td><td>@x.Position</td><td>@x.Unit</td><td>@x.CurrentEvaluator</td><td>@x.Total / @x.Max</td><td><span class="score-pill">@x.Percentage.ToString("0.0")٪</span></td><td>@x.Status</td><td>@if(x.Status=="ثبت نشده" && selected.StartAt<=DateTime.Now && selected.EndAt>=DateTime.Now && selected.IsOpen){<a class="btn btn-sm btn-main" href="/Evaluation/Form?id=@x.Id&periodId=@selected.Id">ارزیابی</a>}else if(x.Status!="ثبت نشده"){<a class="btn btn-sm btn-outline-primary" href="/Evaluation/Review?evaluationId=@Model.Employees.First(y=>y.Id==x.Id).Id">جزئیات</a>}else{<span class="muted-box">دوره بسته</span>}</td></tr>}
+        </tbody></table></div>
+    </div>
+}
