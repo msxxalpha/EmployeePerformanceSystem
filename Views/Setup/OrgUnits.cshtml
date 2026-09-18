@@ -1,6 +1,7 @@
 @model SetupController.OrgUnitsVm
 @{ ViewData["Title"]="ساختار سازمانی"; }
-<div class="page-header"><div><div class="eyebrow">ساختار سازمان</div><h2>واحدهای سازمانی</h2><p class="text-muted">ساختار واحدها برای گزارش‌های سازمانی است؛ سلسله‌مراتب ارزیابی کارکنان با Supervisor هر کارمند تعیین می‌شود.</p></div></div>
+<div class="page-header"><div><div class="eyebrow">ساختار سازمان</div><h2>واحدهای سازمانی</h2><p class="text-muted">ساختار واحدها برای گزارش‌های سازمانی است؛ سلسله‌مراتب ارزیابی کارکنان با Supervisor هر کارمند تعیین می‌شود.</p></div><a class="btn btn-outline-secondary" href="/Setup/ExportOrgUnits">خروجی Excel</a></div>
+<h2>واحدهای سازمانی</h2><p class="text-muted">ساختار واحدها برای گزارش‌های سازمانی است؛ سلسله‌مراتب ارزیابی کارکنان با Supervisor هر کارمند تعیین می‌شود.</p></div></div>
 <div class="form-panel mb-4"><div class="panel-title"><div><h4>افزودن واحد سازمانی</h4><span>واحد والد را از فهرست انتخاب کنید.</span></div></div>
 <form method="post" action="/Setup/AddOrgUnit" class="row g-3">@Html.AntiForgeryToken()<div class="col-md-3"><label class="form-label">کد واحد *</label><input name="code" class="form-control" required></div><div class="col-md-5"><label class="form-label">عنوان واحد *</label><input name="title" class="form-control" required></div><div class="col-md-3"><label class="form-label">واحد والد</label><select name="parentId" class="form-select"><option value="">سطح اصلی</option>@foreach(var p in Model.ParentOptions){<option value="@p.Id">@p.Code — @p.Title</option>}</select></div><div class="col-md-1 d-flex align-items-end"><button class="btn btn-main w-100">+</button></div></form></div>
 <div class="toolbar"><input class="form-control table-search" data-table-filter="#units" placeholder="جست‌وجوی واحد..."></div>
