@@ -15,7 +15,7 @@ public class EvaluationController(AppDbContext db, PerformanceService ps, ExcelS
     [HttpGet]
     public async Task<IActionResult> Index(int? periodId)
     {
-        if (!TryEvaluator(out var evaluatorId)) return Forbid();
+        if (!TryEvaluator(out var evaluatorId) || !await ps.IsEvaluator(evaluatorId)) return Forbid();
         await ps.SyncExpiredPeriodsAsync();
 
         var periods = await db.Periods.AsNoTracking().OrderByDescending(x => x.StartAt).ToListAsync();
@@ -43,7 +43,7 @@ public class EvaluationController(AppDbContext db, PerformanceService ps, ExcelS
             var max = ev?.FinalMaxScore ?? 0;
             var score = ev?.FinalScore ?? 0;
             return new Row(
-                e.Id, e.FullName, e.PersonnelNo, e.Position?.Title ?? "—", e.Unit?.Title ?? "—",
+                e.Id, ev?.Id, e.FullName, e.PersonnelNo, e.Position?.Title ?? "—", e.Unit?.Title ?? "—",
                 e.IsEvaluator,
                 ev?.Status.ToString() ?? "ثبت نشده",
                 score, max, Percent(score, max),
@@ -51,7 +51,9 @@ public class EvaluationController(AppDbContext db, PerformanceService ps, ExcelS
                 ev != null && ev.EvaluatorId != evaluatorId);
         }).ToList();
 
-        var analytics = BuildAnalytics(evaluations, employees);
+        var questionIds = evaluations.SelectMany(x => x.Scores).Select(x => x.QuestionId).Distinct().ToList();
+        var questionMap = questionIds.Count == 0 ? new Dictionary<int, Question>() : await db.Questions.AsNoTracking().Where(x => questionIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id);
+        var analytics = BuildAnalytics(evaluations, employees, questionMap);
         var periodOptions = periods.Select(p => new PeriodOptionVm(p.Id, p.Title, p.StartAt <= DateTime.Now && p.EndAt >= DateTime.Now && p.IsOpen, p.EndAt < DateTime.Now, evaluations.Any(e => e.PeriodId == p.Id))).ToList();
 
         var message = active == null
@@ -66,7 +68,7 @@ public class EvaluationController(AppDbContext db, PerformanceService ps, ExcelS
     [HttpGet]
     public async Task<IActionResult> Form(int id, int? periodId = null)
     {
-        if (!TryEvaluator(out var actor)) return Forbid();
+        if (!TryEvaluator(out var actor) || !await ps.IsEvaluator(actor)) return Forbid();
         await ps.SyncExpiredPeriodsAsync();
 
         var period = periodId.HasValue
@@ -99,7 +101,7 @@ public class EvaluationController(AppDbContext db, PerformanceService ps, ExcelS
     [HttpGet]
     public async Task<IActionResult> Review(int evaluationId)
     {
-        if (!TryEvaluator(out var actor)) return Forbid();
+        if (!TryEvaluator(out var actor) || !await ps.IsEvaluator(actor)) return Forbid();
         await ps.SyncExpiredPeriodsAsync();
 
         var ev = await db.Evaluations.Include(x => x.Scores).Include(x => x.Period).SingleOrDefaultAsync(x => x.Id == evaluationId);
@@ -122,7 +124,7 @@ public class EvaluationController(AppDbContext db, PerformanceService ps, ExcelS
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> Form(FormPost m)
     {
-        if (!TryEvaluator(out var actor)) return Forbid();
+        if (!TryEvaluator(out var actor) || !await ps.IsEvaluator(actor)) return Forbid();
 
         var period = await ps.CurrentPeriod();
         if (period == null)
@@ -211,7 +213,7 @@ public class EvaluationController(AppDbContext db, PerformanceService ps, ExcelS
     [HttpGet]
     public async Task<IActionResult> ExportMyList(int? periodId)
     {
-        if (!TryEvaluator(out var eid)) return Forbid();
+        if (!TryEvaluator(out var eid) || !await ps.IsEvaluator(eid)) return Forbid();
         var employees = await ps.GetSubordinates(eid);
         var ids = employees.Select(x => x.Id).ToList();
         var period = periodId.HasValue ? await db.Periods.AsNoTracking().SingleOrDefaultAsync(x => x.Id == periodId.Value) : await ps.CurrentPeriod();
@@ -246,7 +248,7 @@ public class EvaluationController(AppDbContext db, PerformanceService ps, ExcelS
         return int.TryParse(User.FindFirstValue("EmployeeId"), out id) && id > 0;
     }
 
-    private static Analytics BuildAnalytics(List<Evaluation> evaluations, List<Employee> employees)
+    private static Analytics BuildAnalytics(List<Evaluation> evaluations, List<Employee> employees, Dictionary<int, Question> questionMap)
     {
         var evaluated = evaluations.Where(x => x.FinalMaxScore > 0).Select(x => new PerformanceRow(x.EmployeeId, employees.FirstOrDefault(e => e.Id == x.EmployeeId)?.FullName ?? "—", Percent(x.FinalScore, x.FinalMaxScore))).OrderByDescending(x => x.Percentage).ToList();
         var tops = evaluated.Take(5).ToList();
@@ -254,7 +256,7 @@ public class EvaluationController(AppDbContext db, PerformanceService ps, ExcelS
 
         var questionAverages = evaluations.SelectMany(e => e.Scores)
             .GroupBy(s => s.QuestionId)
-            .Select(g => new QuestionAverageVm(g.Key, g.First().QuestionId.ToString(), Math.Round(g.Average(s => s.MaxScore == 0 ? 0 : s.Score * 100 / s.MaxScore), 1), g.Count()))
+            .Select(g => new QuestionAverageVm(g.Key, questionMap.GetValueOrDefault(g.Key)?.Title ?? ("سؤال " + g.Key), Math.Round(g.Average(s => s.MaxScore == 0 ? 0 : s.Score * 100 / s.MaxScore), 1), g.Count()))
             .OrderByDescending(x => x.AveragePercentage).ToList();
 
         return new Analytics(tops, lows, questionAverages);
@@ -262,7 +264,7 @@ public class EvaluationController(AppDbContext db, PerformanceService ps, ExcelS
 
     public record DashboardVm(EvaluationPeriod? SelectedPeriod, EvaluationPeriod? ActivePeriod, List<EvaluationPeriod> Periods, List<PeriodOptionVm> PeriodOptions, List<Row> Employees, List<PerformanceRow> TopPerformers, List<PerformanceRow> Improvements, List<QuestionAverageVm> QuestionAverages, string? Message);
     public record PeriodOptionVm(int Id, string Title, bool IsActive, bool IsClosed, bool HasEvaluations);
-    public record Row(int Id,string Name,string PersonnelNo,string Position,string Unit,bool IsEvaluator,string Status,decimal Total,decimal Max,decimal Percentage,string CurrentEvaluator,bool IsTakeover);
+    public record Row(int Id,int? EvaluationId,string Name,string PersonnelNo,string Position,string Unit,bool IsEvaluator,string Status,decimal Total,decimal Max,decimal Percentage,string CurrentEvaluator,bool IsTakeover);
     public record PerformanceRow(int EmployeeId,string Name,decimal Percentage);
     public record QuestionAverageVm(int QuestionId,string Label,decimal AveragePercentage,int Responses);
     public record Analytics(List<PerformanceRow> TopPerformers,List<PerformanceRow> Improvements,List<QuestionAverageVm> QuestionAverages);
