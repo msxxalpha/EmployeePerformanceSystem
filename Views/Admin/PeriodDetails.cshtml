@@ -1,0 +1,11 @@
+@model AdminController.PeriodDetailsVm
+@{ViewData["Title"]="جزئیات دوره";}
+<div class="page-header"><div><div class="eyebrow">دوره ارزیابی</div><h2>@Model.Period.Title</h2><p class="text-muted">@Model.Period.StartJalali تا @Model.Period.EndJalali</p></div><div class="toolbar-actions"><a class="btn btn-outline-secondary" href="/Admin/EditPeriod?id=@Model.Period.Id">ویرایش</a><a class="btn btn-outline-primary" href="/Admin/Periods">بازگشت</a></div></div>
+<div class="row g-3 mb-4">
+<div class="col-md-4"><div class="metric-card"><span>وضعیت</span><strong>@(Model.Period.IsOpen && Model.Period.EndAt>=DateTime.Now?"فعال":"بسته")</strong><small>بر اساس ساعت سیستم</small></div></div>
+<div class="col-md-4"><div class="metric-card"><span>ارزیابی‌های ثبت‌شده</span><strong>@Model.Evaluations.Count</strong><small>در این دوره</small></div></div>
+<div class="col-md-4"><div class="metric-card"><span>میانگین درصد</span><strong>@(Model.Evaluations.Count==0?0:Math.Round(Model.Evaluations.Where(x=>x.Max>0).Select(x=>x.Score/x.Max*100).DefaultIfEmpty().Average(),1))٪</strong><small>درصد از سقف هر فرد</small></div></div>
+</div>
+<div class="table-panel"><div class="toolbar"><input class="form-control" data-table-filter="#periodDetails" placeholder="جست‌وجوی کارمند، پرسنلی، واحد یا ارزیاب..."><span class="form-hint">مرتب‌سازی با کلیک روی عنوان ستون</span></div>
+<div class="table-responsive"><table id="periodDetails" class="table modern-table"><thead><tr><th>کارمند</th><th>پرسنلی</th><th>واحد</th><th>رده</th><th>ارزیاب</th><th>امتیاز</th><th>درصد</th><th>وضعیت</th><th></th></tr></thead><tbody>
+@foreach(var x in Model.Evaluations){<tr><td class="fw-bold">@x.Employee</td><td>@x.PersonnelNo</td><td>@x.Unit</td><td>@x.Position</td><td>@x.Evaluator</td><td>@x.Score / @x.Max</td><td><span class="score-pill">@(x.Max==0?0:Math.Round(x.Score*100/x.Max,1))٪</span></td><td>@x.Status</td><td><a class="btn btn-sm btn-outline-primary" href="/Evaluation/Review?evaluationId=@x.EvaluationId">جزئیات</a></td></tr>}</tbody></table></div></div>
