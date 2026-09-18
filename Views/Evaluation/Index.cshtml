@@ -27,9 +27,14 @@
         <select name="periodId" class="form-select" onchange="this.form.submit()">
             <option value="">@(active!=null?"دوره فعال":"انتخاب دوره")</option>
             @foreach(var p in Model.PeriodOptions){
-                <option value="@p.Id" @(selected != null && selected.Id == p.Id ? "selected" : "")>
-                    @p.Title @(p.IsActive?" — فعال":" — بسته")
-                </option>
+                if(selected != null && selected.Id == p.Id)
+                {
+                    <option value="@p.Id" selected>@p.Title @(p.IsActive?" — فعال":" — بسته")</option>
+                }
+                else
+                {
+                    <option value="@p.Id">@p.Title @(p.IsActive?" — فعال":" — بسته")</option>
+                }
             }
         </select>
     </form>
@@ -42,7 +47,7 @@
     <div class="row g-3 mb-4">
         <div class="col-xl-3 col-md-6"><div class="metric-card metric-main"><span>تعداد زیرمجموعه</span><strong>@Model.Employees.Count</strong><small>درخت سلسله‌مراتبی ارزیاب</small></div></div>
         <div class="col-xl-3 col-md-6"><div class="metric-card"><span>ارزیابی ثبت‌شده</span><strong>@Model.Employees.Count(x=>x.Status!="ثبت نشده")</strong><small>در دوره منتخب</small></div></div>
-        <div class="col-xl-3 col-md-6"><div class="metric-card"><span>میانگین عملکرد</span><strong>@(Model.Employees.Count(x=>x.Max>0)?Math.Round(Model.Employees.Where(x=>x.Max>0).Average(x=>x.Percentage),1):0m)٪</strong><small>درصد از سقف ارزیابی</small></div></div>
+        <div class="col-xl-3 col-md-6"><div class="metric-card"><span>میانگین عملکرد</span><strong>@(Model.Employees.Count(x=>x.Max>0)>0?Math.Round(Model.Employees.Where(x=>x.Max>0).Average(x=>x.Percentage),1):0m)٪</strong><small>درصد از سقف ارزیابی</small></div></div>
         <div class="col-xl-3 col-md-6"><div class="metric-card"><span>ارزیابی نشده</span><strong>@Model.Employees.Count(x=>x.Status=="ثبت نشده")</strong><small>@(selected.EndAt<DateTime.Now?"دوره بسته است":"نیازمند اقدام")</small></div></div>
     </div>
 
