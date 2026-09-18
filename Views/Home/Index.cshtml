@@ -1,70 +1,17 @@
-@model Indamin.Performance.Controllers.HomeController.HomeVm
-@{
-    ViewData["Title"] = "داشبورد مدیریت";
-}
-
-<div class="dashboard-hero">
-    <div class="hero-copy">
-        <div class="eyebrow">مرکز مدیریت سامانه</div>
-        <h1>سلام، @Model.Name</h1>
-        <p>از این بخش می‌توانید دوره‌های ارزیابی، اطلاعات کارکنان، ساختار سازمانی، رده‌های پستی و گزارش‌های مدیریتی را مدیریت کنید.</p>
-        <div class="hero-actions">
-            <a class="btn btn-main btn-lg" href="/Admin/Periods"><span>+</span> تعریف دوره ارزیابی</a>
-            <a class="btn btn-light-outline btn-lg" href="/Admin/Employees">مشاهده کارکنان</a>
-        </div>
-    </div>
-    <div class="hero-visual" aria-hidden="true">
-        <div class="visual-ring ring-one"></div>
-        <div class="visual-ring ring-two"></div>
-        <div class="visual-core">
-            <span class="core-bar h1"></span><span class="core-bar h2"></span><span class="core-bar h3"></span><span class="core-bar h4"></span>
-        </div>
-    </div>
-</div>
-
-<div class="section-heading">
-    <div><span class="eyebrow">نمای کلی</span><h2>وضعیت سامانه</h2></div>
-    <span class="section-note">اطلاعات لحظه‌ای پایگاه داده</span>
-</div>
-
+@model HomeController.HomeVm
+@{ ViewData["Title"]="داشبورد مدیریت"; }
+<div class="dashboard-hero"><div class="hero-copy"><div class="eyebrow">مرکز مدیریت سامانه</div><h1>سلام، @Model.Name</h1><p>کنترل دوره‌ها، اطلاعات کارکنان، بانک سؤالات، رده‌های پستی، ساختار سازمانی و گزارش‌های ارزیابی از این صفحه در دسترس است.</p><div class="hero-actions"><a class="btn btn-main btn-lg" href="/Admin/Periods">تعریف دوره ارزیابی</a><a class="btn btn-light-outline btn-lg" href="/Setup/Questions">مدیریت سؤالات</a></div></div><div class="hero-visual"><div class="visual-ring ring-one"></div><div class="visual-ring ring-two"></div><div class="visual-core"><span class="core-bar h1"></span><span class="core-bar h2"></span><span class="core-bar h3"></span><span class="core-bar h4"></span></div></div></div>
+<div class="section-heading"><div><div class="eyebrow">نمای کلی</div><h2>وضعیت سامانه</h2></div><span class="section-note">اطلاعات لحظه‌ای پایگاه داده</span></div>
 <div class="row g-3 metric-grid">
-    <div class="col-xl-3 col-md-6"><div class="stat-card stat-primary"><div class="stat-icon">◌</div><div><span>کارکنان فعال</span><strong>@Model.ActiveEmployees</strong><small>حساب‌های سازمانی</small></div></div></div>
-    <div class="col-xl-3 col-md-6"><div class="stat-card"><div class="stat-icon">✓</div><div><span>ارزیابان فعال</span><strong>@Model.Evaluators</strong><small>مجاز به ارزیابی</small></div></div></div>
-    <div class="col-xl-3 col-md-6"><div class="stat-card"><div class="stat-icon">▣</div><div><span>دوره‌های باز</span><strong>@Model.OpenPeriods</strong><small>آماده دریافت ارزیابی</small></div></div></div>
-    <div class="col-xl-3 col-md-6"><div class="stat-card"><div class="stat-icon">▥</div><div><span>ارزیابی‌های ثبت‌شده</span><strong>@Model.Evaluations</strong><small>ثبت نهایی یا ارسال‌شده</small></div></div></div>
-</div>
-
-<div class="section-heading section-heading-gap">
-    <div><span class="eyebrow">عملیات مدیریتی</span><h2>دسترسی سریع</h2></div>
-    <span class="section-note">تمام فرم‌های اجرایی از این بخش در دسترس هستند</span>
-</div>
-
+<div class="col-xl-3 col-md-6"><div class="stat-card stat-primary"><div class="stat-icon">◌</div><div><span>کارکنان فعال</span><strong>@Model.ActiveEmployees</strong><small>حساب‌های سازمانی</small></div></div></div>
+<div class="col-xl-3 col-md-6"><div class="stat-card"><div class="stat-icon">✓</div><div><span>ارزیابان فعال</span><strong>@Model.Evaluators</strong><small>مجاز به ارزیابی</small></div></div></div>
+<div class="col-xl-3 col-md-6"><div class="stat-card"><div class="stat-icon">▣</div><div><span>دوره‌های باز</span><strong>@Model.OpenPeriods</strong><small>دوره قابل دسترس</small></div></div></div>
+<div class="col-xl-3 col-md-6"><div class="stat-card"><div class="stat-icon">?</div><div><span>بانک سؤالات</span><strong>@Model.Questions</strong><small>سؤال‌های فعال</small></div></div></div></div>
+<div class="section-heading section-heading-gap"><div><div class="eyebrow">عملیات مدیریتی</div><h2>دسترسی سریع</h2></div></div>
 <div class="row g-3">
-    <div class="col-lg-4 col-md-6"><a class="action-card" href="/Admin/Periods"><span class="action-icon">▣</span><div><strong>دوره‌های ارزیابی</strong><p>تعریف بازه ارزیابی ماهیانه و مدیریت دوره‌ها</p></div><span class="action-arrow">←</span></a></div>
-    <div class="col-lg-4 col-md-6"><a class="action-card" href="/Admin/Employees"><span class="action-icon">◌</span><div><strong>مدیریت کارکنان</strong><p>مشاهده، جستجو و دریافت اطلاعات کارکنان</p></div><span class="action-arrow">←</span></a></div>
-    <div class="col-lg-4 col-md-6"><a class="action-card" href="/Admin/ImportEmployees"><span class="action-icon">⇧</span><div><strong>ورود از Excel</strong><p>بارگذاری اطلاعات کارکنان و ساخت حساب ورود</p></div><span class="action-arrow">←</span></a></div>
-    <div class="col-lg-4 col-md-6"><a class="action-card" href="/Setup/Positions"><span class="action-icon">☷</span><div><strong>رده‌های پستی و سؤالات</strong><p>تعریف سقف امتیاز و شاخص‌های هر رده</p></div><span class="action-arrow">←</span></a></div>
-    <div class="col-lg-4 col-md-6"><a class="action-card" href="/Setup/OrgUnits"><span class="action-icon">⌘</span><div><strong>ساختار سازمانی</strong><p>تعریف واحدها و روابط والد و زیرمجموعه</p></div><span class="action-arrow">←</span></a></div>
-    <div class="col-lg-4 col-md-6"><a class="action-card" href="/Reports"><span class="action-icon">▥</span><div><strong>گزارش‌های مدیریتی</strong><p>مشاهده نتایج و دریافت خروجی Excel</p></div><span class="action-arrow">←</span></a></div>
-</div>
-
-<div class="row g-3 mt-1">
-    <div class="col-lg-7">
-        <div class="info-card setup-card">
-            <div class="card-heading"><div><span class="eyebrow">وضعیت پیکربندی</span><h3>اطلاعات پایه سامانه</h3></div><span class="mini-label">کنترل سریع</span></div>
-            <div class="setup-row"><span>رده‌های پستی</span><strong>@Model.Positions</strong><a href="/Setup/Positions">مدیریت</a></div>
-            <div class="setup-row"><span>واحدهای سازمانی</span><strong>@Model.Units</strong><a href="/Setup/OrgUnits">مدیریت</a></div>
-            <div class="setup-row"><span>کارکنان فعال</span><strong>@Model.ActiveEmployees</strong><a href="/Admin/Employees">مشاهده</a></div>
-        </div>
-    </div>
-    <div class="col-lg-5">
-        <div class="info-card guide-card">
-            <div class="eyebrow">روند پیشنهادی راه‌اندازی</div>
-            <h3>از اطلاعات پایه تا اولین ارزیابی</h3>
-            <div class="guide-step"><span>۱</span><div><b>ساختار سازمانی</b><small>واحدها و روابط سازمانی</small></div></div>
-            <div class="guide-step"><span>۲</span><div><b>رده‌های پستی</b><small>سؤال‌ها و سقف امتیاز</small></div></div>
-            <div class="guide-step"><span>۳</span><div><b>کارکنان و ارزیابان</b><small>ورود اطلاعات از Excel</small></div></div>
-            <div class="guide-step"><span>۴</span><div><b>دوره ارزیابی</b><small>تعریف بازه ماهیانه</small></div></div>
-        </div>
-    </div>
-</div>
+<div class="col-lg-4 col-md-6"><a class="action-card" href="/Admin/Periods"><span class="action-icon">▣</span><div><strong>دوره‌های ارزیابی</strong><p>تعریف بازه و مدیریت دوره‌های ماهیانه</p></div><span class="action-arrow">←</span></a></div>
+<div class="col-lg-4 col-md-6"><a class="action-card" href="/Admin/Employees"><span class="action-icon">◌</span><div><strong>مدیریت کارکنان</strong><p>مشاهده اطلاعات و دریافت Excel</p></div><span class="action-arrow">←</span></a></div>
+<div class="col-lg-4 col-md-6"><a class="action-card" href="/Admin/ImportEmployees"><span class="action-icon">⇧</span><div><strong>ورود کارکنان از Excel</strong><p>ساخت حساب ورود و ساختار سرپرستی</p></div><span class="action-arrow">←</span></a></div>
+<div class="col-lg-4 col-md-6"><a class="action-card" href="/Setup/Questions"><span class="action-icon">?</span><div><strong>بانک سؤالات</strong><p>تعریف حوزه، عنوان، توضیحات و اتصال به رده‌ها</p></div><span class="action-arrow">←</span></a></div>
+<div class="col-lg-4 col-md-6"><a class="action-card" href="/Setup/Positions"><span class="action-icon">☷</span><div><strong>رده‌های پستی</strong><p>مشاهده سقف امتیاز و سؤال‌های متصل</p></div><span class="action-arrow">←</span></a></div>
+<div class="col-lg-4 col-md-6"><a class="action-card" href="/Reports"><span class="action-icon">▥</span><div><strong>گزارش‌های مدیریتی</strong><p>مشاهده و خروجی Excel نتایج</p></div><span class="action-arrow">←</span></a></div></div>
