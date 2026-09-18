@@ -3,7 +3,7 @@ IF COL_LENGTH('Questions','Title') IS NULL ALTER TABLE Questions ADD Title NVARC
 IF COL_LENGTH('Questions','Domain') IS NULL ALTER TABLE Questions ADD Domain NVARCHAR(150) NULL;
 IF COL_LENGTH('Questions','Description') IS NULL ALTER TABLE Questions ADD Description NVARCHAR(1000) NULL;
 IF COL_LENGTH('Questions','Text') IS NULL ALTER TABLE Questions ADD Text NVARCHAR(1000) NULL;
-IF COL_LENGTH('Questions','Title') IS NOT NULL AND COL_LENGTH('Questions','Text') IS NOT NULL UPDATE Questions SET Title=COALESCE(NULLIF(Title,''),Text) WHERE Title IS NULL OR Title='';
+IF COL_LENGTH('Questions','Title') IS NOT NULL AND COL_LENGTH('Questions','Text') IS NOT NULL UPDATE Questions SET Title=COALESCE(NULLIF(Title,''),NULLIF(Text,''),CONCAT(N'سؤال ',Id)) WHERE Title IS NULL OR Title='';
 UPDATE Questions SET Code=CONCAT('Q',Id) WHERE Code IS NULL OR Code='';
 UPDATE Questions SET Domain=N'عمومی' WHERE Domain IS NULL OR Domain='';
 
