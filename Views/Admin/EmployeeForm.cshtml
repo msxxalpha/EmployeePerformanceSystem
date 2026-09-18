@@ -1,0 +1,31 @@
+@model AdminController.EmployeeFormVm
+@{
+    var editing = Model.Employee != null;
+    ViewData["Title"] = editing ? "ویرایش کارمند" : "افزودن کارمند";
+    var e = Model.Employee;
+}
+<div class="page-header">
+    <div><div class="eyebrow">مدیریت منابع انسانی</div><h2>@ViewData["Title"]</h2><p class="text-muted">اطلاعات شناسنامه‌ای، جایگاه سازمانی و رابطه ارزیابی را مدیریت کنید.</p></div>
+    <a class="btn btn-outline-secondary" href="/Admin/Employees">بازگشت</a>
+</div>
+<div class="form-panel">
+<form method="post" action="@(editing ? "/Admin/EditEmployee" : "/Admin/CreateEmployee")" class="row g-3">
+@Html.AntiForgeryToken()
+@if(editing){<input type="hidden" name="Id" value="@e!.Id">}
+<div class="col-lg-3 col-md-6"><label class="form-label">شماره پرسنلی *</label><input name="PersonnelNo" class="form-control" value="@e?.PersonnelNo" required maxlength="50"></div>
+<div class="col-lg-3 col-md-6"><label class="form-label">کد ملی *</label><input name="NationalNo" class="form-control" value="@e?.NationalNo" required maxlength="20" inputmode="numeric"></div>
+<div class="col-lg-4 col-md-8"><label class="form-label">نام و نام خانوادگی *</label><input name="FullName" class="form-control" value="@e?.FullName" required maxlength="200"></div>
+<div class="col-lg-2 col-md-4"><label class="form-label">موبایل</label><input name="Mobile" class="form-control" value="@e?.Mobile" maxlength="30" inputmode="tel"></div>
+<div class="col-lg-4 col-md-6"><label class="form-label">رده پستی *</label><select name="PositionId" class="form-select" required><option value="">انتخاب کنید</option>@foreach(var p in Model.Positions){<option value="@p.Id" selected="@(e?.PositionId==p.Id)">@p.Code — @p.Title</option>}</select></div>
+<div class="col-lg-4 col-md-6"><label class="form-label">واحد سازمانی *</label><select name="UnitId" class="form-select" required><option value="">انتخاب کنید</option>@foreach(var u in Model.Units){<option value="@u.Id" selected="@(e?.UnitId==u.Id)">@u.Code — @u.Title</option>}</select></div>
+<div class="col-lg-4"><label class="form-label">سرپرست مستقیم</label><select name="SupervisorId" class="form-select"><option value="">بدون سرپرست</option>@foreach(var s in Model.Supervisors){<option value="@s.Id" selected="@(e?.SupervisorId==s.Id)">@s.PersonnelNo — @s.FullName</option>}</select></div>
+<div class="col-md-6">
+<div class="form-switch-card"><div><b>ویژگی ارزیاب</b><small>این کارمند می‌تواند زیرمجموعه سلسله‌مراتبی خود را ارزیابی کند.</small></div><label class="switch"><input type="checkbox" name="IsEvaluator" value="true" @(e?.IsEvaluator==true?"checked":"")><span></span></label></div>
+</div>
+<div class="col-md-6">
+<div class="form-switch-card"><div><b>وضعیت حساب</b><small>در صورت غیرفعال بودن، ورود سامانه برای کارمند مسدود می‌شود.</small></div><label class="switch"><input type="checkbox" name="IsActive" value="true" @(e?.IsActive!=false?"checked":"")><span></span></label></div>
+</div>
+<div class="col-12"><div class="login-note"><b>نکته ورود:</b> حساب کارمند با شماره پرسنلی ساخته می‌شود. رمز اولیه برای حساب جدید، کد ملی است و به صورت Hash ذخیره می‌شود. ویرایش اطلاعات کارمند رمز فعلی را تغییر نمی‌دهد.</div></div>
+<div class="col-12 d-flex justify-content-end"><button class="btn btn-main px-4" type="submit">@(editing?"ذخیره تغییرات":"ایجاد کارمند و حساب ورود")</button></div>
+</form>
+</div>
