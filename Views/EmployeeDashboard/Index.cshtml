@@ -2,7 +2,7 @@
 @{ ViewData["Title"] = "داشبورد عملکرد من"; var d = Model.SelectedDetail; }
 <div class="dashboard-head d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
   <div><div class="eyebrow">داشبورد شخصی عملکرد</div><h2 class="fw-bold mb-1">سلام، @Model.Name</h2><div class="text-muted">@Model.Position · @Model.Unit · پرسنلی @Model.PersonnelNo</div></div>
-  <form method="get" class="period-picker"><label>دوره ارزیابی</label><select name="periodId" class="form-select" onchange="this.form.submit()"><option value="">آخرین دوره دارای ارزیابی</option>@foreach(var p in Model.Periods){<option value="@p.Id" selected="@(Model.SelectedPeriodId==p.Id)">@p.Title @(!p.HasEvaluation ? "(بدون ارزیابی)" : "")</option>}</select></form>
+  <form method="get" class="period-picker"><label>دوره ارزیابی</label><select name="periodId" class="form-select" onchange="this.form.submit()"><option value="">انتخاب دوره ارزیابی</option>@foreach(var p in Model.Periods){<option value="@p.Id" selected="@(Model.SelectedPeriodId==p.Id)">@p.Title @(!p.HasEvaluation ? "(بدون ارزیابی)" : "")</option>}</select></form>
 </div>
 @if(d == null){<div class="card p-5 text-center empty-state"><div class="display-6">📊</div><h4>هنوز ارزیابی‌ای برای شما ثبت نشده است</h4><p class="text-muted mb-0">پس از ثبت ارزیابی، امتیازها و روند عملکرد شما در این داشبورد نمایش داده می‌شود.</p></div>}
 else {
@@ -17,7 +17,7 @@ else {
  <div class="col-xl-4"><div class="card chart-card"><div class="card-title-row"><div><h5>وضعیت دوره منتخب</h5><span>@d.Title · @d.Date</span></div></div><div class="gauge"><div class="gauge-value">@d.Percentage.ToString("0.0")٪</div><div class="gauge-caption">امتیاز کل</div></div></div></div>
 </div>
 <div class="row g-3 mb-4">
- <div class="col-xl-7"><div class="card chart-card"><div class="card-title-row"><div><h5>عملکرد به تفکیک سؤال</h5><span>میانگین درصد کسب‌شده در دوره‌های دارای امتیاز</span></div></div><div class="chart-wrap tall"><canvas id="questionChart"></canvas></div></div></div>
+ <div class="col-xl-7"><div class="card chart-card"><div class="card-title-row"><div><h5>عملکرد به تفکیک سؤال</h5><span>درصد کسب‌شده در دوره منتخب</span></div></div><div class="chart-wrap tall"><canvas id="questionChart"></canvas></div></div></div>
  <div class="col-xl-5"><div class="card"><div class="card-title-row"><div><h5>نقاط قوت</h5><span>شاخص‌هایی با عملکرد پایدارتر</span></div></div><div class="area-list">@if(!Model.Strengths.Any()){<div class="muted-box">مورد مشخصی در این آستانه ثبت نشده است.</div>} @foreach(var x in Model.Strengths){<div class="area-row"><div><span>@x.Label</span><b>@x.Percentage.ToString("0.0")٪</b></div><div class="progress"><div class="progress-bar" style="width:@Math.Min(100,x.Percentage)%"></div></div></div>}</div></div></div>
 </div>
 <div class="row g-3 mb-4">
