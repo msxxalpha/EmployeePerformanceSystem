@@ -1,3 +1,12 @@
+SET NOCOUNT ON;
+SET XACT_ABORT ON;
+
+BEGIN TRY
+    BEGIN TRANSACTION;
+
+    IF OBJECT_ID('AppUsers','U') IS NOT NULL
+        THROW 50000, 'Database already contains the EmployeePerformanceSystem schema. Use an empty database for this initial script.', 1;
+
 CREATE TABLE AppUsers(
     Id INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_AppUsers PRIMARY KEY,
     UserName NVARCHAR(100) NOT NULL,
@@ -220,3 +229,11 @@ CREATE INDEX IX_EvaluatorChangeHistory_PreviousEvaluatorId ON EvaluatorChangeHis
 CREATE INDEX IX_EvaluatorChangeHistory_NewEvaluatorId ON EvaluatorChangeHistory(NewEvaluatorId);
 CREATE INDEX IX_EvaluatorChangeHistory_ChangedBy ON EvaluatorChangeHistory(ChangedBy);
 CREATE INDEX IX_AuditLogs_UserId ON AuditLogs(UserId);
+
+
+    COMMIT TRANSACTION;
+END TRY
+BEGIN CATCH
+    IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+    THROW;
+END CATCH;
