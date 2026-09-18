@@ -1,1 +1,135 @@
-<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>@ViewData["Title"] - سامانه ارزیابی عملکرد</title><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet"><link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet"><link href="~/css/site.css" rel="stylesheet">@RenderSection("Head",required:false)</head><body><header class="topbar"><div class="container-fluid d-flex justify-content-between align-items-center"><a class="brand" href="/">سامانه ارزیابی عملکرد کارکنان</a><div>@if(User.Identity?.IsAuthenticated==true){<span>@User.Identity.Name</span> <form class="d-inline" method="post" action="/Account/Logout">@Html.AntiForgeryToken()<button class="btn btn-sm btn-light">خروج</button></form>}</div></div></header><div class="container-fluid"><div class="row"><aside class="col-lg-2 sidebar"><a href="/">داشبورد من</a>@if(User.FindFirst("EmployeeId")!=null){<a href="/EmployeeDashboard">گزارش عملکرد من</a>}@if(User.FindFirst("EmployeeId")!=null && User.FindFirst("IsAdmin")?.Value!="1"){<a href="/Evaluation">ارزیابی کارکنان</a>}@if(User.HasClaim("IsAdmin","1")){<hr><a href="/Admin/Periods">دوره‌های ارزیابی</a><a href="/Admin/Employees">کارکنان</a><a href="/Admin/ImportEmployees">ورود از Excel</a><a href="/Setup/Positions">رده‌های پستی و سوالات</a><a href="/Setup/OrgUnits">ساختار سازمانی</a><a href="/Reports">گزارش‌ها</a>}</aside><main class="col-lg-10 py-4">@RenderBody()</main></div></div><script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script><script src="~/js/site.js"></script>@RenderSection("Scripts",required:false)</body></html>
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="theme-color" content="#102a43">
+    <title>@ViewData["Title"] - سامانه ارزیابی عملکرد</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet">
+    <link href="~/css/site.css" rel="stylesheet">
+    @RenderSection("Head", required: false)
+</head>
+<body>
+    <div class="app-shell">
+        <aside class="app-sidebar" id="appSidebar">
+            <div class="sidebar-brand">
+                <div class="brand-mark" aria-hidden="true">
+                    <span></span><span></span><span></span>
+                </div>
+                <div>
+                    <div class="brand-title">ایندامین سایپا</div>
+                    <div class="brand-subtitle">سامانه ارزیابی عملکرد</div>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-caption">دسترسی سریع</div>
+                <a class="nav-item @Active("/", "Home")" href="/">
+                    <span class="nav-icon">⌂</span><span>داشبورد</span>
+                </a>
+                @if (User.FindFirst("EmployeeId") != null)
+                {
+                    <a class="nav-item @Active("/EmployeeDashboard", "EmployeeDashboard")" href="/EmployeeDashboard">
+                        <span class="nav-icon">◉</span><span>داشبورد عملکرد من</span>
+                    </a>
+                    @if (User.FindFirst("IsEvaluator")?.Value == "1")
+                    {
+                        <a class="nav-item @Active("/Evaluation", "Evaluation")" href="/Evaluation">
+                            <span class="nav-icon">✓</span><span>ارزیابی کارکنان</span>
+                        </a>
+                    }
+                }
+            </div>
+
+            @if (User.HasClaim("IsAdmin", "1"))
+            {
+                <div class="sidebar-section">
+                    <div class="sidebar-caption">مدیریت سامانه</div>
+                    <a class="nav-item @Active("/Admin/Periods", "Admin")" href="/Admin/Periods">
+                        <span class="nav-icon">▣</span><span>دوره‌های ارزیابی</span>
+                    </a>
+                    <a class="nav-item" href="/Admin/Employees">
+                        <span class="nav-icon">◌</span><span>مدیریت کارکنان</span>
+                    </a>
+                    <a class="nav-item" href="/Admin/ImportEmployees">
+                        <span class="nav-icon">⇧</span><span>ورود کارکنان از Excel</span>
+                    </a>
+                    <a class="nav-item @Active("/Setup/Positions", "Setup")" href="/Setup/Positions">
+                        <span class="nav-icon">☷</span><span>رده‌های پستی و سؤالات</span>
+                    </a>
+                    <a class="nav-item" href="/Setup/OrgUnits">
+                        <span class="nav-icon">⌘</span><span>ساختار سازمانی</span>
+                    </a>
+                    <a class="nav-item @Active("/Reports", "Reports")" href="/Reports">
+                        <span class="nav-icon">▥</span><span>گزارش‌های مدیریتی</span>
+                    </a>
+                </div>
+            }
+
+            <div class="sidebar-footer">
+                <div class="footer-dot"></div>
+                <div>
+                    <div class="footer-title">وضعیت سامانه</div>
+                    <div class="footer-status">در حال سرویس‌دهی</div>
+                </div>
+            </div>
+        </aside>
+
+        <div class="app-main">
+            <header class="app-topbar">
+                <div class="topbar-left">
+                    <button class="mobile-menu" type="button" aria-label="باز کردن منو" onclick="document.body.classList.toggle('sidebar-open')">☰</button>
+                    <div>
+                        <div class="topbar-overline">سامانه یکپارچه منابع انسانی</div>
+                        <div class="topbar-title">@ViewData["Title"]</div>
+                    </div>
+                </div>
+                <div class="topbar-user">
+                    <div class="user-avatar">@((User.Identity?.Name ?? "کاربر").Trim().Length > 0 ? (User.Identity?.Name ?? "کاربر").Trim()[0].ToString() : "ک")</div>
+                    <div class="user-meta">
+                        <strong>@(User.Identity?.Name ?? "کاربر")</strong>
+                        <span>@(User.HasClaim("IsAdmin", "1") ? "مدیر سیستم" : (User.FindFirst("IsEvaluator")?.Value == "1" ? "ارزیاب" : "کارمند"))</span>
+                    </div>
+                    <form method="post" action="/Account/Logout" class="ms-2">
+                        @Html.AntiForgeryToken()
+                        <button class="btn btn-logout" title="خروج">خروج</button>
+                    </form>
+                </div>
+            </header>
+
+            <main class="app-content">
+                @if (TempData["Result"] != null)
+                {
+                    <div class="alert alert-success app-alert" role="alert">
+                        <span class="alert-icon">✓</span>
+                        <span>@TempData["Result"]</span>
+                    </div>
+                }
+                @RenderBody()
+            </main>
+
+            <footer class="app-footer">
+                <span>سامانه ارزیابی عملکرد کارکنان</span>
+                <span>© ایندامین سایپا</span>
+            </footer>
+        </div>
+    </div>
+
+    <div class="sidebar-overlay" onclick="document.body.classList.remove('sidebar-open')"></div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js"></script>
+    @RenderSection("Scripts", required: false)
+</body>
+</html>
+
+@functions {
+    string Active(string prefix, string controller)
+    {
+        var path = Context.Request.Path.Value ?? "/";
+        var isMatch = prefix == "/"
+            ? string.Equals(path, "/", StringComparison.OrdinalIgnoreCase)
+            : path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+        return isMatch ? "active" : "";
+    }
+}
