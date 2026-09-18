@@ -1,103 +1,18 @@
-using System.Globalization;
-using Indamin.Performance.Data;
-using Microsoft.EntityFrameworkCore;
+using System.Globalization;using Indamin.Performance.Data;using Microsoft.EntityFrameworkCore;
 namespace Indamin.Performance.Services;
-public class PerformanceService(AppDbContext db)
-{
-    public static DateTime Jalali(string value)
-    {
-        var p = value.Replace('-', '/').Split('/');
-        if (p.Length != 3) throw new ArgumentException("تاریخ شمسی نامعتبر است.");
-        var pc = new PersianCalendar();
-        var result = pc.ToDateTime(int.Parse(p[0]), int.Parse(p[1]), int.Parse(p[2]), 0, 0, 0, 0);
-        return DateTime.SpecifyKind(result, DateTimeKind.Local);
-    }
-    public static string ToJalali(DateTime d){var pc=new PersianCalendar();return $"{pc.GetYear(d):0000}/{pc.GetMonth(d):00}/{pc.GetDayOfMonth(d):00}";}
-    public async Task<EvaluationPeriod?> CurrentPeriod()=>await db.Periods.Where(x=>x.IsOpen&&x.StartAt<=DateTime.Now).OrderByDescending(x=>x.StartAt).FirstOrDefaultAsync();
-    public Task<bool> CanEdit(EvaluationPeriod p)=>Task.FromResult(p.IsOpen&&DateTime.Now>=p.StartAt&&DateTime.Now<=p.EndAt);
-
-    public async Task<List<Employee>> GetSubordinates(int evaluatorId)
-    {
-        // Authorization scope is derived only from the active Supervisor graph.
-        // Position/Unit are optional enrichments and must never determine hierarchy membership.
-        var employees = await db.Employees.Where(x=>x.IsActive).AsNoTracking().ToListAsync();
-        var byId = employees.ToDictionary(x=>x.Id);
-        var cyclicIds = FindCyclicNodes(byId);
-        var bySupervisor=employees.Where(x=>x.SupervisorId.HasValue).GroupBy(x=>x.SupervisorId!.Value).ToDictionary(g=>g.Key,g=>g.ToList());
-        var result=new List<Employee>();
-        var queue=new Queue<int>();
-        queue.Enqueue(evaluatorId);
-        var visited=new HashSet<int>{evaluatorId};
-        while(queue.Count>0)
-        {
-            var managerId=queue.Dequeue();
-            if(cyclicIds.Contains(managerId))continue;
-            if(!bySupervisor.TryGetValue(managerId,out var children))continue;
-            foreach(var child in children)
-            {
-                if(!visited.Add(child.Id))continue;
-                // A cyclic reporting chain is invalid authorization data; exclude that branch.
-                if(cyclicIds.Contains(child.Id))continue;
-                result.Add(child);
-                queue.Enqueue(child.Id);
-            }
-        }
-        if(result.Count>0)
-        {
-            var positionIds=result.Select(x=>x.PositionId).Distinct().ToList();
-            var unitIds=result.Select(x=>x.UnitId).Distinct().ToList();
-            var positions=await db.Positions.Where(x=>positionIds.Contains(x.Id)).AsNoTracking().ToDictionaryAsync(x=>x.Id);
-            var units=await db.OrgUnits.Where(x=>unitIds.Contains(x.Id)).AsNoTracking().ToDictionaryAsync(x=>x.Id);
-            foreach(var employee in result)
-            {
-                employee.Position=positions.GetValueOrDefault(employee.PositionId);
-                employee.Unit=units.GetValueOrDefault(employee.UnitId);
-            }
-        }
-        return result.OrderBy(x=>x.FullName).ToList();
-    }
-
-    private static HashSet<int> FindCyclicNodes(Dictionary<int,Employee> byId)
-    {
-        // Functional graph cycle detection: each employee has at most one SupervisorId.
-        // Mark every node that belongs to a cycle so no invalid branch can become part
-        // of an authorization scope.
-        var cyclic = new HashSet<int>();
-        var state = new Dictionary<int,byte>(); // 0=unvisited, 1=active path, 2=resolved
-        foreach(var start in byId.Keys)
-        {
-            if(state.TryGetValue(start,out var known) && known!=0)continue;
-            var path=new List<int>();
-            var index=new Dictionary<int,int>();
-            var current=start;
-            while(byId.ContainsKey(current))
-            {
-                if(state.TryGetValue(current,out var s))
-                {
-                    if(s==1 && index.TryGetValue(current,out var cycleStart))
-                    {
-                        for(var i=cycleStart;i<path.Count;i++)cyclic.Add(path[i]);
-                    }
-                    break;
-                }
-                index[current]=path.Count;
-                path.Add(current);
-                state[current]=1;
-                var supervisorId=byId[current].SupervisorId;
-                if(!supervisorId.HasValue || !byId.ContainsKey(supervisorId.Value))break;
-                current=supervisorId.Value;
-            }
-            foreach(var node in path)state[node]=2;
-        }
-        return cyclic;
-    }
-
-    public async Task<List<Employee>> GetDirectSubordinates(int evaluatorId)=>(await GetSubordinates(evaluatorId)).Where(x=>x.SupervisorId==evaluatorId).ToList();
-    public async Task<bool> CanEvaluate(int evaluatorId,int employeeId)=>evaluatorId!=employeeId&&(await GetSubordinates(evaluatorId)).Any(x=>x.Id==employeeId);
-    public async Task<bool> CanReviewEvaluation(int actorId,Evaluation ev){if(!await IsEvaluator(actorId))return false;if(actorId==ev.EvaluatorId)return true;return await IsAncestor(actorId,ev.EvaluatorId);}
-    public async Task<bool> IsEvaluator(int employeeId)=>await db.Employees.AnyAsync(x=>x.Id==employeeId&&x.IsActive&&x.IsEvaluator);
-    public async Task<bool> IsAncestor(int ancestorId,int employeeId){if(ancestorId==employeeId)return false;var employees=await db.Employees.Where(x=>x.IsActive).Select(x=>new{x.Id,x.SupervisorId}).AsNoTracking().ToListAsync();var map=employees.ToDictionary(x=>x.Id,x=>x.SupervisorId);var current=employeeId;var visited=new HashSet<int>();while(map.TryGetValue(current,out var supervisorId)&&supervisorId.HasValue){if(!visited.Add(current))return false;if(supervisorId.Value==ancestorId)return true;current=supervisorId.Value;}return false;}
-    public async Task<decimal> MaxScore(int positionId)=>await db.Questions.Where(x=>x.PositionId==positionId&&x.IsActive).SumAsync(x=>x.MaxScore);
-    public async Task<decimal> Total(int evaluationId)=>await db.Scores.Where(x=>x.EvaluationId==evaluationId).SumAsync(x=>x.Score);
-    public async Task<decimal> MaxForEvaluation(int employeeId){var e=await db.Employees.FindAsync(employeeId);return e==null?0:await MaxScore(e.PositionId);}
+public class PerformanceService(AppDbContext db){
+public static DateTime Jalali(string value){var p=value.Replace('-','/').Split('/',StringSplitOptions.RemoveEmptyEntries);if(p.Length!=3)throw new ArgumentException("تاریخ شمسی نامعتبر است.");if(!int.TryParse(p[0],out var y)||!int.TryParse(p[1],out var m)||!int.TryParse(p[2],out var d))throw new ArgumentException("تاریخ شمسی نامعتبر است.");try{return DateTime.SpecifyKind(new PersianCalendar().ToDateTime(y,m,d,0,0,0,0),DateTimeKind.Local);}catch(ArgumentOutOfRangeException){throw new ArgumentException("تاریخ شمسی خارج از محدوده معتبر است.");}}
+public static string ToJalali(DateTime d){var pc=new PersianCalendar();return $"{pc.GetYear(d):0000}/{pc.GetMonth(d):00}/{pc.GetDayOfMonth(d):00}";}
+public Task<EvaluationPeriod?> CurrentPeriod()=>db.Periods.Where(x=>x.IsOpen&&x.StartAt<=DateTime.Now&&x.EndAt>=DateTime.Now).OrderByDescending(x=>x.StartAt).FirstOrDefaultAsync();
+public Task<EvaluationPeriod?> LatestStartedPeriod()=>db.Periods.Where(x=>x.StartAt<=DateTime.Now).OrderByDescending(x=>x.StartAt).FirstOrDefaultAsync();
+public Task<bool> CanEdit(EvaluationPeriod p)=>Task.FromResult(p.IsOpen&&DateTime.Now>=p.StartAt&&DateTime.Now<=p.EndAt);
+public async Task<List<Employee>> GetSubordinates(int evaluatorId){var employees=await db.Employees.Where(x=>x.IsActive).AsNoTracking().ToListAsync();var byId=employees.ToDictionary(x=>x.Id);var cyclic=FindCyclicNodes(byId);var children=employees.Where(x=>x.SupervisorId.HasValue).GroupBy(x=>x.SupervisorId!.Value).ToDictionary(g=>g.Key,g=>g.ToList());var result=new List<Employee>();var q=new Queue<int>();q.Enqueue(evaluatorId);var visited=new HashSet<int>{evaluatorId};while(q.Count>0){var manager=q.Dequeue();if(cyclic.Contains(manager)||!children.TryGetValue(manager,out var list))continue;foreach(var e in list){if(!visited.Add(e.Id)||cyclic.Contains(e.Id))continue;result.Add(e);q.Enqueue(e.Id);}}if(result.Count>0){var pos=await db.Positions.Where(x=>result.Select(e=>e.PositionId).Contains(x.Id)).AsNoTracking().ToDictionaryAsync(x=>x.Id);var units=await db.OrgUnits.Where(x=>result.Select(e=>e.UnitId).Contains(x.Id)).AsNoTracking().ToDictionaryAsync(x=>x.Id);foreach(var e in result){e.Position=pos.GetValueOrDefault(e.PositionId);e.Unit=units.GetValueOrDefault(e.UnitId);}}return result.OrderBy(x=>x.FullName).ToList();}
+private static HashSet<int> FindCyclicNodes(Dictionary<int,Employee> byId){var cyclic=new HashSet<int>();var state=new Dictionary<int,byte>();foreach(var start in byId.Keys){if(state.TryGetValue(start,out var known)&&known!=0)continue;var path=new List<int>();var index=new Dictionary<int,int>();var current=start;while(byId.ContainsKey(current)){if(state.TryGetValue(current,out var s)){if(s==1&&index.TryGetValue(current,out var cs))for(var i=cs;i<path.Count;i++)cyclic.Add(path[i]);break;}index[current]=path.Count;path.Add(current);state[current]=1;var sup=byId[current].SupervisorId;if(!sup.HasValue||!byId.ContainsKey(sup.Value))break;current=sup.Value;}foreach(var id in path)state[id]=2;}return cyclic;}
+public Task<List<Employee>> GetDirectSubordinates(int evaluatorId)=>GetSubordinates(evaluatorId).ContinueWith(t=>t.Result.Where(x=>x.SupervisorId==evaluatorId).ToList());
+public async Task<bool> CanEvaluate(int evaluatorId,int employeeId)=>evaluatorId!=employeeId&&(await GetSubordinates(evaluatorId)).Any(x=>x.Id==employeeId);
+public async Task<bool> CanReviewEvaluation(int actorId,Evaluation ev)=>await IsEvaluator(actorId)&&(actorId==ev.EvaluatorId||await IsAncestor(actorId,ev.EvaluatorId));
+public Task<bool> IsEvaluator(int id)=>db.Employees.AnyAsync(x=>x.Id==id&&x.IsActive&&x.IsEvaluator);
+public async Task<bool> IsAncestor(int ancestorId,int employeeId){if(ancestorId==employeeId)return false;var map=await db.Employees.Where(x=>x.IsActive).Select(x=>new{x.Id,x.SupervisorId}).AsNoTracking().ToDictionaryAsync(x=>x.Id,x=>x.SupervisorId);var current=employeeId;var visited=new HashSet<int>();while(map.TryGetValue(current,out var sup)&&sup.HasValue){if(!visited.Add(current))return false;if(sup.Value==ancestorId)return true;current=sup.Value;}return false;}
+public Task<decimal> MaxScore(int positionId)=>db.PositionQuestions.Where(x=>x.PositionId==positionId&&x.IsActive&&x.Question!.IsActive).SumAsync(x=>x.MaxScore);
+public Task<decimal> Total(int evaluationId)=>db.Scores.Where(x=>x.EvaluationId==evaluationId).SumAsync(x=>x.Score);public async Task<decimal> MaxForEvaluation(int employeeId){var e=await db.Employees.FindAsync(employeeId);return e==null?0:await MaxScore(e.PositionId);}
 }
