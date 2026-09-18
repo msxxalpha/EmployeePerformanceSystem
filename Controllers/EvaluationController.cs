@@ -49,7 +49,7 @@ public class EvaluationController(AppDbContext db, PerformanceService ps, ExcelS
                 score, max, Percent(score, max),
                 ev == null ? "—" : evaluatorNames.GetValueOrDefault(ev.EvaluatorId, "—"),
                 ev != null && ev.EvaluatorId != evaluatorId);
-        }).ToList();
+        }).Where(x => selected == null || selected.EndAt >= DateTime.Now || x.EvaluationId.HasValue).ToList();
 
         var questionIds = evaluations.SelectMany(x => x.Scores).Select(x => x.QuestionId).Distinct().ToList();
         var questionMap = questionIds.Count == 0 ? new Dictionary<int, Question>() : await db.Questions.AsNoTracking().Where(x => questionIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id);
