@@ -85,6 +85,30 @@ public class AdminController(AppDbContext db, ExcelService excel, PerformanceSer
     }
 
     [HttpGet]
+    public async Task<IActionResult> EvaluationDetails(int id)
+    {
+        var ev = await db.Evaluations.AsNoTracking()
+            .Include(x => x.Period)
+            .Include(x => x.Scores)
+            .SingleOrDefaultAsync(x => x.Id == id);
+        if (ev == null) return NotFound();
+
+        var employee = await db.Employees.AsNoTracking().Include(x => x.Position).Include(x => x.Unit).SingleOrDefaultAsync(x => x.Id == ev.EmployeeId);
+        var evaluator = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.Id == ev.EvaluatorId);
+        var questions = await db.Questions.AsNoTracking().Where(x => ev.Scores.Select(s => s.QuestionId).Contains(x.Id)).ToDictionaryAsync(x => x.Id);
+        var history = await db.ScoreHistory.AsNoTracking().Where(x => x.EvaluationId == id)
+            .Join(db.Questions, h => h.QuestionId, q => q.Id, (h,q) => new HistoryAdminRow(q.Title,h.OldScore,h.NewScore,h.ChangedBy,h.ChangedAt,h.Reason))
+            .OrderByDescending(x => x.ChangedAt).ToListAsync();
+
+        return View(new EvaluationDetailsVm(ev, employee, evaluator?.FullName ?? "—",
+            ev.Scores.OrderBy(x => questions.GetValueOrDefault(x.QuestionId)?.Title).Select(s => new ScoreAdminRow(
+                questions.GetValueOrDefault(s.QuestionId)?.Code ?? ("Q" + s.QuestionId),
+                questions.GetValueOrDefault(s.QuestionId)?.Title ?? ("سؤال " + s.QuestionId),
+                questions.GetValueOrDefault(s.QuestionId)?.Domain ?? "—",
+                s.Score, s.MaxScore, s.Comment)).ToList(), history));
+    }
+
+    [HttpGet]
     public async Task<IActionResult> EditPeriod(int id)
     {
         var p = await db.Periods.FindAsync(id);
@@ -404,6 +428,10 @@ public class AdminController(AppDbContext db, ExcelService excel, PerformanceSer
         public bool IsActive { get; set; } = true;
         public void Normalize() { PersonnelNo = PersonnelNo.Trim(); NationalNo = NationalNo.Trim(); FullName = FullName.Trim(); Mobile = string.IsNullOrWhiteSpace(Mobile) ? null : Mobile.Trim(); }
     }
+
+    public record EvaluationDetailsVm(Evaluation Evaluation, Employee? Employee, string Evaluator, List<ScoreAdminRow> Scores, List<HistoryAdminRow> History);
+    public record ScoreAdminRow(string Code, string Title, string Domain, decimal Score, decimal MaxScore, string? Comment);
+    public record HistoryAdminRow(string QuestionTitle, decimal OldScore, decimal NewScore, int ChangedBy, DateTime ChangedAt, string Reason);
 
     public record PeriodEditVm(int Id, string Title, string StartJalali, string EndJalali, string? Description, bool IsOpen);
     public record PeriodDetailsVm(EvaluationPeriod Period, List<PeriodEvaluationRow> Evaluations);
