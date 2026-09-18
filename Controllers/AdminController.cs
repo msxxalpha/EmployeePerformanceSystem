@@ -233,7 +233,7 @@ public class AdminController(AppDbContext db, ExcelService excel, PerformanceSer
     {
         var e = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id);
         if (e == null) return NotFound();
-        return View(await EmployeeFormVm(e));
+        return View(await BuildEmployeeFormVm(e));
     }
 
     [HttpPost, ValidateAntiForgeryToken]
@@ -380,7 +380,7 @@ public class AdminController(AppDbContext db, ExcelService excel, PerformanceSer
         return File(excel.Employees(rows), ExcelMime, "Employees.xlsx");
     }
 
-    private async Task<EmployeeFormVm> EmployeeFormVm(Employee? employee = null)
+    private async Task<EmployeeFormVm> BuildEmployeeFormVm(Employee? employee = null)
     {
         var positions = await db.Positions.Where(x => x.IsActive).OrderBy(x => x.Title).AsNoTracking().ToListAsync();
         var units = await db.OrgUnits.Where(x => x.IsActive).OrderBy(x => x.Title).AsNoTracking().ToListAsync();
