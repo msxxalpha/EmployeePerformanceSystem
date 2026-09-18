@@ -1,6 +1,7 @@
 @model SetupController.QuestionsVm
 @{ ViewData["Title"]="بانک سؤالات"; }
-<div class="page-header"><div><div class="eyebrow">طراحی مدل ارزیابی</div><h2>بانک سؤالات</h2><p class="text-muted">هر سؤال مستقل تعریف می‌شود و سپس می‌تواند به چند رده پستی با سقف امتیاز متفاوت متصل شود.</p></div><a class="btn btn-outline-primary" href="/Setup/Positions">رده‌های پستی</a></div>
+<div class="page-header"><div><div class="eyebrow">طراحی مدل ارزیابی</div><h2>بانک سؤالات</h2><p class="text-muted">سؤال‌ها مستقل تعریف می‌شوند و برای هر رده پستی، سقف امتیاز و ترتیب اختصاصی دارند.</p></div><div class="toolbar-actions"><a class="btn btn-outline-secondary" href="/Setup/ExportQuestions">خروجی Excel</a><a class="btn btn-outline-primary" href="/Setup/Positions">رده‌های پستی</a></div></div>
+<h2>بانک سؤالات</h2><p class="text-muted">هر سؤال مستقل تعریف می‌شود و سپس می‌تواند به چند رده پستی با سقف امتیاز متفاوت متصل شود.</p></div><a class="btn btn-outline-primary" href="/Setup/Positions">رده‌های پستی</a></div>
 <div class="form-panel mb-4"><div class="panel-title"><div><h4>تعریف سؤال جدید</h4><span>کد، عنوان، حوزه ارزیابی و توضیحات را ثبت کنید.</span></div><span class="panel-badge">سؤال مستقل</span></div>
 <form method="post" action="/Setup/AddQuestion" class="row g-3">@Html.AntiForgeryToken()
 <div class="col-lg-2 col-md-4"><label class="form-label">کد سؤال *</label><input name="code" class="form-control" placeholder="Q-001" required></div>
