@@ -219,7 +219,7 @@ public class AdminController(AppDbContext db, ExcelService excel, PerformanceSer
         if (model.SupervisorId.HasValue)
         {
             var supervisor = await db.Employees.SingleOrDefaultAsync(x => x.Id == model.SupervisorId.Value && x.IsActive);
-            if (supervisor == null || supervisor.Id == model.Id) { TempData["Error"] = "سرپرست انتخاب‌شده معتبر نیست."; return RedirectToAction(nameof(CreateEmployee)); }
+            if (supervisor == null || await ps.WouldCreateSupervisorCycle(model.Id, model.SupervisorId)) { TempData["Error"] = "سرپرست انتخاب‌شده معتبر نیست یا باعث ایجاد حلقه سازمانی می‌شود."; return RedirectToAction(nameof(CreateEmployee)); }
         }
 
         var employee = new Employee
@@ -292,9 +292,9 @@ public class AdminController(AppDbContext db, ExcelService excel, PerformanceSer
             TempData["Error"] = "یک کارمند نمی‌تواند سرپرست خودش باشد.";
             return RedirectToAction(nameof(EditEmployee), new { id = model.Id });
         }
-        if (model.SupervisorId.HasValue && !await db.Employees.AnyAsync(x => x.Id == model.SupervisorId.Value && x.IsActive))
+        if (model.SupervisorId.HasValue && (!await db.Employees.AnyAsync(x => x.Id == model.SupervisorId.Value && x.IsActive) || await ps.WouldCreateSupervisorCycle(e.Id, model.SupervisorId)))
         {
-            TempData["Error"] = "سرپرست انتخاب‌شده معتبر نیست.";
+            TempData["Error"] = "سرپرست انتخاب‌شده معتبر نیست یا باعث ایجاد حلقه سازمانی می‌شود.";
             return RedirectToAction(nameof(EditEmployee), new { id = model.Id });
         }
 
