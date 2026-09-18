@@ -102,6 +102,28 @@ public class PerformanceService(AppDbContext db)
         return cyclic;
     }
 
+    public async Task<bool> WouldCreateSupervisorCycle(int employeeId, int? supervisorId)
+    {
+        if (!supervisorId.HasValue) return false;
+        if (employeeId == supervisorId.Value) return true;
+
+        var map = await db.Employees.Where(x => x.IsActive)
+            .Select(x => new { x.Id, x.SupervisorId })
+            .AsNoTracking()
+            .ToDictionaryAsync(x => x.Id, x => x.SupervisorId);
+
+        var current = supervisorId.Value;
+        var visited = new HashSet<int>();
+        while (map.TryGetValue(current, out var parent))
+        {
+            if (!visited.Add(current)) return true;
+            if (parent == employeeId) return true;
+            if (!parent.HasValue) return false;
+            current = parent.Value;
+        }
+        return false;
+    }
+
     public async Task<bool> CanEvaluate(int evaluatorId, int employeeId) =>
         evaluatorId != employeeId && (await GetSubordinates(evaluatorId)).Any(x => x.Id == employeeId);
 
