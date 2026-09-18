@@ -4,6 +4,17 @@ public class AppDbContext(DbContextOptions<AppDbContext> options):DbContext(opti
  public DbSet<AppUser> Users=>Set<AppUser>();public DbSet<OrgUnit> OrgUnits=>Set<OrgUnit>();public DbSet<Position> Positions=>Set<Position>();public DbSet<Question> Questions=>Set<Question>();public DbSet<Employee> Employees=>Set<Employee>();public DbSet<EvaluationPeriod> Periods=>Set<EvaluationPeriod>();public DbSet<Evaluation> Evaluations=>Set<Evaluation>();public DbSet<EvaluationScore> Scores=>Set<EvaluationScore>();public DbSet<EvaluationScoreHistory> ScoreHistory=>Set<EvaluationScoreHistory>();public DbSet<EvaluatorChangeHistory> EvaluatorHistory=>Set<EvaluatorChangeHistory>();public DbSet<AuditLog> AuditLogs=>Set<AuditLog>();
  protected override void OnModelCreating(ModelBuilder b){
   b.Entity<AppUser>().ToTable("AppUsers");
+  b.Entity<OrgUnit>().ToTable("OrgUnits");
+  b.Entity<Position>().ToTable("Positions");
+  b.Entity<Question>().ToTable("Questions");
+  b.Entity<Employee>().ToTable("Employees");
+  b.Entity<EvaluationPeriod>().ToTable("EvaluationPeriods");
+  b.Entity<Evaluation>().ToTable("Evaluations");
+  b.Entity<EvaluationScore>().ToTable("EvaluationScores");
+  b.Entity<EvaluationScoreHistory>().ToTable("EvaluationScoreHistory");
+  b.Entity<EvaluatorChangeHistory>().ToTable("EvaluatorChangeHistory");
+  b.Entity<AuditLog>().ToTable("AuditLogs");
+
   b.Entity<AppUser>().HasIndex(x=>x.UserName).IsUnique();
   b.Entity<Employee>().HasIndex(x=>x.PersonnelNo).IsUnique();
   b.Entity<Employee>().HasOne(x=>x.Position).WithMany().HasForeignKey(x=>x.PositionId).OnDelete(DeleteBehavior.Restrict);
