@@ -18,7 +18,8 @@ public class HomeController(AppDbContext db) : Controller
             var evaluations = await db.Evaluations.CountAsync(x => x.Status != EvaluationStatus.Draft);
             var positions = await db.Positions.CountAsync(x => x.IsActive);
             var units = await db.OrgUnits.CountAsync(x => x.IsActive);
-            return View(new HomeVm(User.Identity?.Name ?? "مدیر سیستم", activeEmployees, evaluators, openPeriods, evaluations, positions, units));
+            var questions = await db.Questions.CountAsync(x => x.IsActive);
+            return View(new HomeVm(User.Identity?.Name ?? "مدیر سیستم", activeEmployees, evaluators, openPeriods, evaluations, positions, units, questions));
         }
 
         return RedirectToAction("Index", "EmployeeDashboard");
@@ -33,5 +34,6 @@ public class HomeController(AppDbContext db) : Controller
         int OpenPeriods,
         int Evaluations,
         int Positions,
-        int Units);
+        int Units,
+        int Questions);
 }
