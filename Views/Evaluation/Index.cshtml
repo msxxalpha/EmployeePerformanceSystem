@@ -27,7 +27,7 @@
         <select name="periodId" class="form-select" onchange="this.form.submit()">
             <option value="">@(active!=null?"دوره فعال":"انتخاب دوره")</option>
             @foreach(var p in Model.PeriodOptions){
-                <option value="@p.Id" selected="@(selected?.Id==p.Id)">
+                <option value="@p.Id" @(selected != null && selected.Id == p.Id ? "selected" : "")>
                     @p.Title @(p.IsActive?" — فعال":" — بسته")
                 </option>
             }
