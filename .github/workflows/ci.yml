@@ -41,8 +41,9 @@ jobs:
           3. Set the IIS site's physical path to `Application`.
           4. Use an IIS Application Pool with `No Managed Code`.
           5. Configure the SQL Server connection string in `Application/appsettings.json`.
-          6. Create the target database and run `Database/001_initial.sql`.
-          7. Browse to the site and verify the login page.
+          6. For a new empty database, either run Database/001_initial.sql manually or let the application create the schema on first start.
+          7. For an existing database from an earlier version, do not run 001_initial.sql; the application applies 002_upgrade.sql automatically.
+          8. Browse to the site and verify the login page.
 
           ## Accounts
           Administrator: `admin` / the value configured by `InitialAdminPassword`.
