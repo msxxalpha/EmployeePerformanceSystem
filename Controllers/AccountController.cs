@@ -17,6 +17,8 @@ public class AccountController(AppDbContext db):Controller{
  if(u.EmployeeId.HasValue){claims.Add(new Claim("EmployeeId",u.EmployeeId.Value.ToString()));var e=await db.Employees.AsNoTracking().SingleAsync(x=>x.Id==u.EmployeeId.Value);claims.Add(new Claim("IsEvaluator",e.IsEvaluator?"1":"0"));}
  await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme,new ClaimsPrincipal(new ClaimsIdentity(claims,CookieAuthenticationDefaults.AuthenticationScheme)));
  if(!string.IsNullOrWhiteSpace(m.returnUrl)&&Url.IsLocalUrl(m.returnUrl))return Redirect(m.returnUrl);
- return Redirect(u.IsAdmin?"/":"/EmployeeDashboard");}
+ if(u.IsAdmin)return Redirect("/");
+ if(u.EmployeeId.HasValue){var emp=await db.Employees.AsNoTracking().SingleAsync(x=>x.Id==u.EmployeeId.Value);return Redirect(emp.IsEvaluator?"/Evaluation":"/EmployeeDashboard");}
+ return Redirect("/");}
 [HttpPost][Authorize][ValidateAntiForgeryToken]public async Task<IActionResult> Logout(){await HttpContext.SignOutAsync();return RedirectToAction(nameof(Login));}
 [AllowAnonymous]public IActionResult Denied()=>Content("دسترسی غیرمجاز است.");public record LoginVm{public string UserName{get;set;}="";public string Password{get;set;}="";public string? returnUrl{get;set;}}}
