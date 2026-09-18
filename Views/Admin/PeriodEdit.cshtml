@@ -1,0 +1,14 @@
+@model AdminController.PeriodEditVm
+@{ViewData["Title"]="ویرایش دوره ارزیابی";}
+<div class="page-header"><div><div class="eyebrow">مدیریت دوره</div><h2>ویرایش @Model.Title</h2><p class="text-muted">تاریخ‌ها با تقویم هجری شمسی و زمان اجرا بر اساس ساعت سیستم مدیریت می‌شوند.</p></div><a class="btn btn-outline-secondary" href="/Admin/Periods">بازگشت</a></div>
+<div class="form-panel">
+<form method="post" action="/Admin/EditPeriod" class="row g-3">@Html.AntiForgeryToken()
+<input type="hidden" name="Id" value="@Model.Id">
+<div class="col-lg-4"><label class="form-label">عنوان دوره *</label><input name="Title" class="form-control" value="@Model.Title" required maxlength="100"></div>
+<div class="col-lg-4"><label class="form-label">تاریخ شروع *</label><div class="jalali-input"><input name="StartJalali" class="form-control" data-jalali-date value="@Model.StartJalali" required><button class="date-trigger" type="button" data-jalali-trigger>▣</button></div></div>
+<div class="col-lg-4"><label class="form-label">تاریخ پایان *</label><div class="jalali-input"><input name="EndJalali" class="form-control" data-jalali-date value="@Model.EndJalali" required><button class="date-trigger" type="button" data-jalali-trigger>▣</button></div></div>
+<div class="col-12"><label class="form-label">توضیحات</label><textarea name="Description" class="form-control" rows="3" maxlength="1000">@Model.Description</textarea></div>
+<div class="col-md-6"><div class="form-switch-card"><div><b>دوره فعال باشد</b><small>فقط در صورتی فعال می‌ماند که تاریخ پایان هنوز نرسیده باشد.</small></div><label class="switch"><input type="checkbox" name="IsOpen" value="true" @(Model.IsOpen?"checked":"")><span></span></label></div></div>
+<div class="col-12"><div class="login-note">حتی در صورت انتخاب فعال، سرور دوره‌ای که تاریخ پایان آن گذشته باشد را فعال محسوب نمی‌کند.</div></div>
+<div class="col-12 d-flex justify-content-end"><button class="btn btn-main px-4" type="submit">ذخیره دوره</button></div>
+</form></div>
