@@ -5,130 +5,20 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 namespace Indamin.Performance.Controllers;
-
 [Authorize]
-public class EvaluationController(AppDbContext db, PerformanceService ps, ExcelService excel) : Controller
+public class EvaluationController(AppDbContext db,PerformanceService ps,ExcelService excel):Controller
 {
-    public async Task<IActionResult> Index()
-    {
-        if (!int.TryParse(User.FindFirstValue("EmployeeId"), out var eid) || !await ps.IsEvaluator(eid)) return Forbid();
-        var p = await ps.CurrentPeriod();
-        if (p == null) return View(new List<Row>());
-        var employees = await ps.GetSubordinates(eid);
-        var ids = employees.Select(x => x.Id).ToList();
-        var evaluations = await db.Evaluations.AsNoTracking().Where(x => x.PeriodId == p.Id && ids.Contains(x.EmployeeId)).ToListAsync();
-        var evaluationIds = evaluations.Select(x => x.Id).ToList();
-        var totals = await db.Scores.AsNoTracking().Where(x => evaluationIds.Contains(x.EvaluationId)).GroupBy(x => x.EvaluationId).Select(g => new { EvaluationId = g.Key, Total = g.Sum(x => x.Score) }).ToDictionaryAsync(x => x.EvaluationId, x => x.Total);
-        var positionIds = employees.Select(e => e.PositionId).Distinct().ToList();
-        var maxByPosition = await db.Questions.AsNoTracking().Where(x => x.IsActive && positionIds.Contains(x.PositionId)).GroupBy(x => x.PositionId).Select(g => new { PositionId = g.Key, Max = g.Sum(x => x.MaxScore) }).ToDictionaryAsync(x => x.PositionId, x => x.Max);
-        var evaluatorIds = evaluations.Select(x => x.EvaluatorId).Distinct().ToList();
-        var evaluatorNames = await db.Employees.AsNoTracking().Where(x => evaluatorIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.FullName);
-        var rows = employees.Select(x =>
-        {
-            var ev = evaluations.FirstOrDefault(e => e.EmployeeId == x.Id);
-            var max = maxByPosition.GetValueOrDefault(x.PositionId, 0m);
-            var total = ev == null ? 0m : totals.GetValueOrDefault(ev.Id, 0m);
-            var percentage = max > 0 ? Math.Round(total * 100m / max, 2) : 0m;
-            return new Row(x.Id, x.FullName, x.PersonnelNo, x.Position?.Title ?? "", x.Unit?.Title ?? "", x.IsEvaluator, ev?.Status.ToString() ?? "ثبت نشده", total, max, percentage, ev == null ? "-" : evaluatorNames.GetValueOrDefault(ev.EvaluatorId, "-"));
-        }).ToList();
-        return View(rows);
-    }
-
-    [HttpGet]
-    public async Task<IActionResult> ExportMyList()
-    {
-        if (!int.TryParse(User.FindFirstValue("EmployeeId"), out var eid) || !await ps.IsEvaluator(eid)) return Forbid();
-        var rows = await ps.GetSubordinates(eid);
-        return File(excel.Employees(rows), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "MySubordinates.xlsx");
-    }
-
-    public record Row(int Id, string Name, string PersonnelNo, string Position, string Unit, bool IsEvaluator, string Status, decimal Total, decimal Max, decimal Percentage, string CurrentEvaluator);
-
-    [HttpGet]
-    public async Task<IActionResult> Form(int id)
-    {
-        if (!int.TryParse(User.FindFirstValue("EmployeeId"), out var actor) || !await ps.IsEvaluator(actor)) return Forbid();
-        var p = await ps.CurrentPeriod();
-        if (p == null) return NotFound();
-        var employee = await db.Employees.Include(x => x.Position).FirstOrDefaultAsync(x => x.Id == id && x.IsActive);
-        if (employee == null || !await ps.CanEvaluate(actor, id)) return Forbid();
-        var ev = await db.Evaluations.Include(x => x.Scores).SingleOrDefaultAsync(x => x.PeriodId == p.Id && x.EmployeeId == id);
-        var questions = await Questions(employee.PositionId);
-        var history = ev == null ? new List<HistoryRow>() : await History(ev.Id);
-        if (ev != null && !await ps.CanReviewEvaluation(actor, ev))
-            return View(new FormVm(p, employee, questions, ev, false, "این ارزیابی قبلاً توسط ارزیاب بالادست بازنگری شده و شما فقط مجاز به مشاهده آن هستید.", history));
-        var canEdit = await ps.CanEdit(p) && (ev == null || await ps.CanReviewEvaluation(actor, ev));
-        var note = !await ps.CanEdit(p) ? "بازه ارزیابی پایان یافته است؛ اطلاعات این دوره فقط قابل مشاهده است." : null;
-        return View(new FormVm(p, employee, questions, ev, canEdit, note, history));
-    }
-
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Form(FormPost m)
-    {
-        if (!int.TryParse(User.FindFirstValue("EmployeeId"), out var actor) || !await ps.IsEvaluator(actor)) return Forbid();
-        var p = await ps.CurrentPeriod();
-        if (p == null) return NotFound();
-        if (!await ps.CanEdit(p)) return BadRequest("بازه ارزیابی پایان یافته است و امکان تغییر وجود ندارد.");
-        var employee = await db.Employees.Include(x => x.Position).FirstOrDefaultAsync(x => x.Id == m.EmployeeId && x.IsActive);
-        if (employee == null) return NotFound();
-        if (!await ps.CanEvaluate(actor, employee.Id)) return Forbid();
-        var ev = await db.Evaluations.Include(x => x.Scores).SingleOrDefaultAsync(x => x.PeriodId == p.Id && x.EmployeeId == employee.Id);
-        var isNew = ev == null;
-        if (isNew)
-        {
-            ev = new Evaluation { PeriodId = p.Id, EmployeeId = employee.Id, EvaluatorId = actor, OriginalEvaluatorId = actor, Status = EvaluationStatus.Draft };
-            db.Evaluations.Add(ev);
-        }
-        else if (!await ps.CanReviewEvaluation(actor, ev!)) return Forbid();
-
-        var evaluation = ev ?? throw new InvalidOperationException("Evaluation could not be initialized.");
-        var qs = await Questions(employee.PositionId);
-        foreach (var q in qs)
-        {
-            var score = m.Scores.TryGetValue(q.Id, out var suppliedScore) ? suppliedScore : 0m;
-            if (score < 0 || score > q.MaxScore)
-            {
-                ModelState.AddModelError($"Scores[{q.Id}]", $"امتیاز سؤال «{q.Text}» باید بین صفر و {q.MaxScore} باشد.");
-                continue;
-            }
-            var comment = m.Comments.TryGetValue(q.Id, out var c) ? c?.Trim() : null;
-            var old = evaluation.Scores.FirstOrDefault(x => x.QuestionId == q.Id);
-            if (old == null)
-                evaluation.Scores.Add(new EvaluationScore { QuestionId = q.Id, Score = score, Comment = comment });
-            else if (old.Score != score || old.Comment != comment)
-            {
-                db.ScoreHistory.Add(new EvaluationScoreHistory { EvaluationId = evaluation.Id, QuestionId = q.Id, OldScore = old.Score, NewScore = score, ChangedBy = actor, Reason = evaluation.EvaluatorId == actor ? "اصلاح ارزیابی" : "بازنگری ارزیاب بالادست" });
-                old.Score = score; old.Comment = comment; old.UpdatedAt = DateTime.UtcNow;
-            }
-        }
-        if (!ModelState.IsValid)
-        {
-            var history = evaluation.Id > 0 ? await History(evaluation.Id) : new List<HistoryRow>();
-            return View("Form", new FormVm(p, employee, qs, evaluation, true, "برخی امتیازها نامعتبر هستند؛ لطفاً موارد مشخص‌شده را اصلاح کنید.", history));
-        }
-        if (evaluation.EvaluatorId != actor)
-        {
-            db.EvaluatorHistory.Add(new EvaluatorChangeHistory { EvaluationId = evaluation.Id, PreviousEvaluatorId = evaluation.EvaluatorId, NewEvaluatorId = actor, ChangedBy = actor, Reason = "بازنگری ارزیاب بالادست" });
-            evaluation.EvaluatorId = actor;
-        }
-        evaluation.Status = EvaluationStatus.Submitted;
-        evaluation.UpdatedAt = DateTime.UtcNow;
-        int? appUserId = int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var parsedUserId) ? parsedUserId : null;
-        db.AuditLogs.Add(new AuditLog { Action = isNew ? "EvaluationCreated" : "EvaluationUpdated", Entity = "Evaluation", EntityId = isNew ? "new" : evaluation.Id.ToString(), Details = $"EmployeeId={employee.Id};EvaluatorId={actor};Total={evaluation.Scores.Sum(x => x.Score)};Max={qs.Sum(x => x.MaxScore)}", UserId = appUserId });
-        await db.SaveChangesAsync();
-        return RedirectToAction(nameof(Index));
-    }
-
-    private Task<List<Question>> Questions(int positionId) => db.Questions.Where(x => x.PositionId == positionId && x.IsActive).OrderBy(x => x.SortOrder).ToListAsync();
-    private Task<List<HistoryRow>> History(int evaluationId) => db.ScoreHistory.AsNoTracking().Where(x => x.EvaluationId == evaluationId).OrderByDescending(x => x.ChangedAt).Select(x => new HistoryRow(x.QuestionId, x.OldScore, x.NewScore, x.ChangedBy, x.ChangedAt, x.Reason)).ToListAsync();
-    public record FormVm(EvaluationPeriod Period, Employee Employee, List<Question> Questions, Evaluation? Evaluation, bool CanEdit, string? Notice, List<HistoryRow> History);
-    public record HistoryRow(int QuestionId, decimal OldScore, decimal NewScore, int ChangedBy, DateTime ChangedAt, string Reason);
-    public class FormPost
-    {
-        public int EmployeeId { get; set; }
-        public int PositionId { get; set; }
-        public Dictionary<int, decimal> Scores { get; set; } = [];
-        public Dictionary<int, string> Comments { get; set; } = [];
-    }
+ public async Task<IActionResult>Index(){if(!int.TryParse(User.FindFirstValue("EmployeeId"),out var evaluatorId)||!await ps.IsEvaluator(evaluatorId))return Forbid();var period=await ps.LatestStartedPeriod();if(period==null)return View(new List<Row>());var employees=await ps.GetSubordinates(evaluatorId);var ids=employees.Select(x=>x.Id).ToList();var evs=await db.Evaluations.AsNoTracking().Where(x=>x.PeriodId==period.Id&&ids.Contains(x.EmployeeId)).ToListAsync();var evalIds=evs.Select(x=>x.EvaluatorId).Distinct().ToList();var names=await db.Employees.Where(x=>evalIds.Contains(x.Id)).ToDictionaryAsync(x=>x.Id,x=>x.FullName);var rows=employees.Select(e=>{var ev=evs.FirstOrDefault(x=>x.EmployeeId==e.Id);var max=ev?.FinalMaxScore??0;var score=ev?.FinalScore??0;return new Row(e.Id,e.FullName,e.PersonnelNo,e.Position?.Title??"—",e.Unit?.Title??"—",e.IsEvaluator,ev?.Status.ToString()??"ثبت نشده",score,max,max>0?Math.Round(score*100/max,1):0,ev==null?"—":names.GetValueOrDefault(ev.EvaluatorId,"—"),ev!=null&&ev.EvaluatorId!=evaluatorId);}).ToList();ViewBag.Period=period;return View(rows);}
+ [HttpGet]public async Task<IActionResult>ExportMyList(){if(!int.TryParse(User.FindFirstValue("EmployeeId"),out var eid)||!await ps.IsEvaluator(eid))return Forbid();return File(excel.Employees(await ps.GetSubordinates(eid)),"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","MySubordinates.xlsx");}
+ [HttpGet]public async Task<IActionResult>Form(int id){if(!int.TryParse(User.FindFirstValue("EmployeeId"),out var actor)||!await ps.IsEvaluator(actor))return Forbid();var period=await ps.LatestStartedPeriod();if(period==null)return NotFound("دوره‌ای تعریف نشده است.");var employee=await db.Employees.AsNoTracking().Include(x=>x.Position).SingleOrDefaultAsync(x=>x.Id==id&&x.IsActive);if(employee==null||!await ps.CanEvaluate(actor,id))return Forbid();var ev=await db.Evaluations.Include(x=>x.Scores).SingleOrDefaultAsync(x=>x.PeriodId==period.Id&&x.EmployeeId==id);var qs=await QuestionList(employee.PositionId);var history=ev==null?[]:await History(ev.Id);if(ev==null&&!await ps.CanEdit(period))return View(new FormVm(period,employee,qs,null,false,"برای این دوره هنوز ارزیابی ثبت نشده و بازه ثبت نیز پایان یافته است.",history,0,0));var review=await ps.CanReviewEvaluation(actor,ev);var edit=await ps.CanEdit(period)&&review;var notice=!await ps.CanEdit(period)?"بازه ارزیابی پایان یافته است؛ اطلاعات فقط قابل مشاهده است.":(!review?"این ارزیابی توسط ارزیاب بالادست بازنگری شده و شما فقط مجاز به مشاهده هستید.":null);var viewQs=qs.Select(q=>q with {Score=ev.Scores.FirstOrDefault(s=>s.QuestionId==q.QuestionId)?.Score??0,Comment=ev.Scores.FirstOrDefault(s=>s.QuestionId==q.QuestionId)?.Comment}).ToList();return View(new FormVm(period,employee,viewQs,ev,edit,notice,history,ev.FinalScore,ev.FinalMaxScore));}
+ [HttpPost,ValidateAntiForgeryToken]public async Task<IActionResult>Form(FormPost m){if(!int.TryParse(User.FindFirstValue("EmployeeId"),out var actor)||!await ps.IsEvaluator(actor))return Forbid();var period=await ps.CurrentPeriod();if(period==null)return BadRequest("در حال حاضر بازه فعالی برای ثبت ارزیابی وجود ندارد.");var employee=await db.Employees.Include(x=>x.Position).SingleOrDefaultAsync(x=>x.Id==m.EmployeeId&&x.IsActive);if(employee==null||!await ps.CanEvaluate(actor,employee.Id))return Forbid();var ev=await db.Evaluations.Include(x=>x.Scores).SingleOrDefaultAsync(x=>x.PeriodId==period.Id&&x.EmployeeId==employee.Id);var isNew=ev==null;if(!isNew&&!await ps.CanReviewEvaluation(actor,ev!))return Forbid();var qs=await QuestionList(employee.PositionId);if(isNew){ev=new Evaluation{PeriodId=period.Id,EmployeeId=employee.Id,EvaluatorId=actor,OriginalEvaluatorId=actor,Status=EvaluationStatus.Draft};foreach(var q in qs){var score=m.Scores.GetValueOrDefault(q.QuestionId);if(score<0||score>q.MaxScore)ModelState.AddModelError($"Scores[{q.QuestionId}]",$"امتیاز «{q.Title}» باید بین صفر و {q.MaxScore} باشد.");ev.Scores.Add(new EvaluationScore{QuestionId=q.QuestionId,Score=score,MaxScore=q.MaxScore,Comment=m.Comments.GetValueOrDefault(q.QuestionId)?.Trim()});}db.Evaluations.Add(ev);}else{foreach(var q in qs){var old=ev!.Scores.FirstOrDefault(x=>x.QuestionId==q.QuestionId);if(old==null){var score=m.Scores.GetValueOrDefault(q.QuestionId);if(score<0||score>q.MaxScore)ModelState.AddModelError($"Scores[{q.QuestionId}]",$"امتیاز «{q.Title}» باید بین صفر و {q.MaxScore} باشد.");ev.Scores.Add(new EvaluationScore{QuestionId=q.QuestionId,Score=score,MaxScore=q.MaxScore,Comment=m.Comments.GetValueOrDefault(q.QuestionId)?.Trim()});continue;}var newScore=m.Scores.GetValueOrDefault(q.QuestionId,old.Score);if(newScore<0||newScore>old.MaxScore)ModelState.AddModelError($"Scores[{q.QuestionId}]",$"امتیاز «{q.Title}» باید بین صفر و {old.MaxScore} باشد.");var comment=m.Comments.GetValueOrDefault(q.QuestionId)?.Trim();if(old.Score!=newScore||old.Comment!=comment){db.ScoreHistory.Add(new EvaluationScoreHistory{EvaluationId=ev.Id,QuestionId=q.QuestionId,OldScore=old.Score,NewScore=newScore,ChangedBy=actor,Reason=ev.EvaluatorId==actor?"اصلاح ارزیابی":"بازنگری ارزیاب بالادست"});old.Score=newScore;old.Comment=comment;old.UpdatedAt=DateTime.UtcNow;}}}
+if(!ModelState.IsValid){var posted=qs.Select(q=>q with {Score=m.Scores.GetValueOrDefault(q.QuestionId),Comment=m.Comments.GetValueOrDefault(q.QuestionId)}).ToList();return View(new FormVm(period,employee,posted,ev,true,"برخی امتیازها نامعتبر هستند؛ سقف سؤال را رعایت کنید.",ev!.Id==0?[]:await History(ev.Id),ev.Scores.Sum(x=>x.Score),ev.Scores.Sum(x=>x.MaxScore)));}
+if(ev!.EvaluatorId!=actor){db.EvaluatorHistory.Add(new EvaluatorChangeHistory{EvaluationId=ev.Id,PreviousEvaluatorId=ev.EvaluatorId,NewEvaluatorId=actor,ChangedBy=actor,Reason="بازنگری ارزیاب بالادست"});ev.EvaluatorId=actor;}ev.FinalScore=ev.Scores.Sum(x=>x.Score);ev.FinalMaxScore=ev.Scores.Sum(x=>x.MaxScore);ev.Status=EvaluationStatus.Submitted;ev.UpdatedAt=DateTime.UtcNow;var userId=int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier),out var uid)?uid:(int?)null;db.AuditLogs.Add(new AuditLog{Action=isNew?"EvaluationCreated":"EvaluationUpdated",Entity="Evaluation",EntityId=ev.Id.ToString(),Details=$"EmployeeId={employee.Id};EvaluatorId={actor};FinalScore={ev.FinalScore};FinalMaxScore={ev.FinalMaxScore}",UserId=userId});await db.SaveChangesAsync();TempData["Result"]="ارزیابی با موفقیت ثبت و امتیاز نهایی محاسبه شد.";return RedirectToAction(nameof(Index));}
+ private Task<List<EvalQuestionVm>>QuestionList(int positionId)=>db.PositionQuestions.AsNoTracking().Where(x=>x.PositionId==positionId&&x.IsActive&&x.Question!=null&&x.Question.IsActive).OrderBy(x=>x.SortOrder).ThenBy(x=>x.Id).Select(x=>new EvalQuestionVm(x.QuestionId,x.Question!.Code,x.Question.Title,x.Question.Domain,x.Question.Description,x.MaxScore,x.SortOrder,0,null)).ToListAsync();
+ private Task<List<HistoryRow>>History(int id)=>db.ScoreHistory.AsNoTracking().Where(x=>x.EvaluationId==id).Join(db.Questions,h=>h.QuestionId,q=>q.Id,(h,q)=>new HistoryRow(q.Title,h.OldScore,h.NewScore,h.ChangedBy,h.ChangedAt,h.Reason)).OrderByDescending(x=>x.ChangedAt).ToListAsync();
+ public record EvalQuestionVm(int QuestionId,string Code,string Title,string Domain,string? Description,decimal MaxScore,int SortOrder,decimal Score,string? Comment);
+ public record FormVm(EvaluationPeriod Period,Employee Employee,List<EvalQuestionVm> Questions,Evaluation? Evaluation,bool CanEdit,string? Notice,List<HistoryRow> History,decimal FinalScore,decimal FinalMaxScore);
+ public record HistoryRow(string QuestionTitle,decimal OldScore,decimal NewScore,int ChangedBy,DateTime ChangedAt,string Reason);
+ public class FormPost{public int EmployeeId{get;set;}public Dictionary<int,decimal> Scores{get;set;}=[];public Dictionary<int,string> Comments{get;set;}=[];}
+ public record Row(int Id,string Name,string PersonnelNo,string Position,string Unit,bool IsEvaluator,string Status,decimal Total,decimal Max,decimal Percentage,string CurrentEvaluator,bool IsTakeover);
 }
