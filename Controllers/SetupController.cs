@@ -2,11 +2,12 @@ using Indamin.Performance.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Indamin.Performance.Services;
 
 namespace Indamin.Performance.Controllers;
 
 [Authorize(Policy = "AdminOnly")]
-public class SetupController(AppDbContext db) : Controller
+public class SetupController(AppDbContext db, ExcelService excel) : Controller
 {
     public async Task<IActionResult> Positions() =>
         View(await db.Positions.Include(x => x.QuestionMappings).ThenInclude(x => x.Question).OrderBy(x => x.Title).ToListAsync());
@@ -156,6 +157,10 @@ public class SetupController(AppDbContext db) : Controller
 
         return RedirectToAction(nameof(OrgUnits));
     }
+
+    [HttpGet] public async Task<IActionResult> ExportPositions(){var rows=await db.Positions.Include(x=>x.QuestionMappings).AsNoTracking().OrderBy(x=>x.Title).ToListAsync();return File(excel.Positions(rows),"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","Positions.xlsx");}
+    [HttpGet] public async Task<IActionResult> ExportQuestions(){var rows=await db.Questions.Include(x=>x.PositionMappings).AsNoTracking().OrderBy(x=>x.Domain).ThenBy(x=>x.Title).ToListAsync();return File(excel.Questions(rows),"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","Questions.xlsx");}
+    [HttpGet] public async Task<IActionResult> ExportOrgUnits(){var rows=await db.OrgUnits.AsNoTracking().OrderBy(x=>x.Title).ToListAsync();return File(excel.OrgUnits(rows),"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","OrgUnits.xlsx");}
 
     public record QuestionsVm(List<Question> Questions, List<Position> Positions);
     public record OrgUnitsVm(List<OrgUnit> Units, List<OrgUnit> ParentOptions);
