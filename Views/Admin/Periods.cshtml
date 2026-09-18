@@ -1,14 +1,23 @@
 @model List<EvaluationPeriod>
 @{ ViewData["Title"]="دوره‌های ارزیابی"; }
-<div class="page-header"><div><div class="eyebrow">پیکربندی</div><h2>دوره‌های ارزیابی</h2><p class="text-muted">هر دوره، نام و بازه زمانی مستقل برای ثبت ارزیابی ماهیانه دارد.</p></div><div class="toolbar-actions"><a class="btn btn-outline-secondary" href="/Admin/ExportPeriods">خروجی Excel</a><a class="btn btn-main" href="/Reports">گزارش‌ها</a></div></div>
-<h2>دوره‌های ارزیابی</h2><p class="text-muted">هر دوره، نام و بازه زمانی مستقل برای ثبت ارزیابی ماهیانه دارد.</p></div><a class="btn btn-main" href="/Reports">گزارش‌ها</a></div>
-<div class="form-panel mb-4"><div class="panel-title"><div><h4>تعریف دوره جدید</h4><span>تاریخ‌ها را با تقویم هجری شمسی انتخاب کنید.</span></div><span class="panel-badge">تقویم شمسی</span></div>
-<form method="post" action="/Admin/CreatePeriod" class="row g-3">@Html.AntiForgeryToken()
-<div class="col-lg-3 col-md-6"><label class="form-label">عنوان دوره *</label><input name="title" class="form-control" placeholder="شهریور ۱۴۰۵" required></div>
-<div class="col-lg-3 col-md-6"><label class="form-label">تاریخ شروع *</label><div class="jalali-input"><input name="startJalali" class="form-control" data-jalali-date placeholder="۱۴۰۵/۰۶/۲۱" required><button type="button" class="date-trigger" data-jalali-trigger>▣</button></div></div>
-<div class="col-lg-3 col-md-6"><label class="form-label">تاریخ پایان *</label><div class="jalali-input"><input name="endJalali" class="form-control" data-jalali-date placeholder="۱۴۰۵/۰۶/۲۵" required><button type="button" class="date-trigger" data-jalali-trigger>▣</button></div></div>
-<div class="col-lg-3 col-md-6"><label class="form-label">توضیحات</label><input name="description" class="form-control" placeholder="توضیحات اختیاری"></div>
-<div class="col-12 d-flex justify-content-end"><button class="btn btn-main px-4">ایجاد دوره</button></div></form></div>
-<div class="table-panel"><div class="panel-title"><div><h4>سوابق دوره‌ها</h4><span>مرتب‌سازی با کلیک روی عنوان ستون و فیلتر با کادر جست‌وجو.</span></div></div>
-<div class="toolbar"><input class="form-control table-search" data-table-filter="#periods" placeholder="جست‌وجوی دوره..."><span class="form-hint">تعداد: @Model.Count</span></div>
-<div class="table-responsive"><table id="periods" class="table modern-table"><thead><tr><th>عنوان</th><th>شروع</th><th>پایان</th><th>وضعیت</th><th>توضیحات</th></tr></thead><tbody>@foreach(var p in Model){<tr><td class="fw-bold">@p.Title</td><td>@p.StartJalali</td><td>@p.EndJalali</td><td><span class="status-chip @(p.IsOpen?"status-open":"status-closed")">@(p.IsOpen?"باز":"بسته")</span></td><td class="text-muted">@(string.IsNullOrWhiteSpace(p.Description)?"—":p.Description)</td></tr>}</tbody></table></div></div>
+<div class="page-header">
+  <div><div class="eyebrow">پیکربندی</div><h2>دوره‌های ارزیابی</h2><p class="text-muted">هر دوره یک بازه مستقل برای ثبت ارزیابی ماهیانه دارد.</p></div>
+  <div class="toolbar-actions"><a class="btn btn-outline-secondary" href="/Admin/ExportPeriods">خروجی Excel</a><a class="btn btn-main" href="/Reports">گزارش‌ها</a></div>
+</div>
+<div class="form-panel mb-4">
+  <div class="panel-title"><div><h4>تعریف دوره جدید</h4><span>تاریخ شروع و پایان با تقویم هجری شمسی انتخاب می‌شود.</span></div><span class="panel-badge">تقویم شمسی</span></div>
+  <form method="post" action="/Admin/CreatePeriod" class="row g-3">@Html.AntiForgeryToken()
+    <div class="col-lg-3 col-md-6"><label class="form-label">عنوان دوره *</label><input name="title" class="form-control" placeholder="شهریور ۱۴۰۵" required maxlength="100"></div>
+    <div class="col-lg-3 col-md-6"><label class="form-label">تاریخ شروع *</label><div class="jalali-input"><input name="startJalali" class="form-control" data-jalali-date placeholder="۱۴۰۵/۰۶/۲۱" required><button type="button" class="date-trigger" data-jalali-trigger>▣</button></div></div>
+    <div class="col-lg-3 col-md-6"><label class="form-label">تاریخ پایان *</label><div class="jalali-input"><input name="endJalali" class="form-control" data-jalali-date placeholder="۱۴۰۵/۰۶/۲۵" required><button type="button" class="date-trigger" data-jalali-trigger>▣</button></div></div>
+    <div class="col-lg-3 col-md-6"><label class="form-label">توضیحات</label><input name="description" class="form-control" placeholder="توضیحات اختیاری" maxlength="1000"></div>
+    <div class="col-12 d-flex justify-content-end"><button class="btn btn-main px-4" type="submit">ایجاد دوره</button></div>
+  </form>
+</div>
+<div class="table-panel">
+  <div class="panel-title"><div><h4>سوابق دوره‌ها</h4><span>مرتب‌سازی با کلیک روی ستون و فیلتر با کادر جست‌وجو.</span></div></div>
+  <div class="toolbar"><input class="form-control table-search" data-table-filter="#periods" placeholder="جست‌وجوی دوره..."><span class="form-hint">تعداد: @Model.Count</span></div>
+  <div class="table-responsive"><table id="periods" class="table modern-table"><thead><tr><th>عنوان</th><th>شروع</th><th>پایان</th><th>وضعیت</th><th>توضیحات</th></tr></thead><tbody>
+  @foreach(var p in Model){<tr><td class="fw-bold">@p.Title</td><td>@p.StartJalali</td><td>@p.EndJalali</td><td><span class="status-chip @(p.IsOpen?"status-open":"status-closed")">@(p.IsOpen?"باز":"بسته")</span></td><td class="text-muted">@(string.IsNullOrWhiteSpace(p.Description)?"—":p.Description)</td></tr>}
+  </tbody></table></div>
+</div>
