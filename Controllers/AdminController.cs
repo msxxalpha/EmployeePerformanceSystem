@@ -164,7 +164,7 @@ public class AdminController(AppDbContext db, ExcelService excel, PerformanceSer
     [HttpGet]
     public async Task<IActionResult> CreateEmployee()
     {
-        return View(await EmployeeFormVm());
+        return View(await BuildEmployeeFormVm());
     }
 
     [HttpPost, ValidateAntiForgeryToken]
@@ -274,7 +274,6 @@ public class AdminController(AppDbContext db, ExcelService excel, PerformanceSer
             return RedirectToAction(nameof(EditEmployee), new { id = model.Id });
         }
 
-        var oldPersonnelNo = e.PersonnelNo;
         e.PersonnelNo = model.PersonnelNo;
         e.NationalNo = model.NationalNo;
         e.FullName = model.FullName;
