@@ -1,0 +1,19 @@
+@model SetupController.QuestionsVm
+@{ ViewData["Title"]="بانک سؤالات"; }
+<div class="page-header"><div><div class="eyebrow">طراحی مدل ارزیابی</div><h2>بانک سؤالات</h2><p class="text-muted">هر سؤال مستقل تعریف می‌شود و سپس می‌تواند به چند رده پستی با سقف امتیاز متفاوت متصل شود.</p></div><a class="btn btn-outline-primary" href="/Setup/Positions">رده‌های پستی</a></div>
+<div class="form-panel mb-4"><div class="panel-title"><div><h4>تعریف سؤال جدید</h4><span>کد، عنوان، حوزه ارزیابی و توضیحات را ثبت کنید.</span></div><span class="panel-badge">سؤال مستقل</span></div>
+<form method="post" action="/Setup/AddQuestion" class="row g-3">@Html.AntiForgeryToken()
+<div class="col-lg-2 col-md-4"><label class="form-label">کد سؤال *</label><input name="code" class="form-control" placeholder="Q-001" required></div>
+<div class="col-lg-4 col-md-8"><label class="form-label">عنوان سؤال *</label><input name="title" class="form-control" placeholder="رعایت الزامات کیفیت" required></div>
+<div class="col-lg-3 col-md-6"><label class="form-label">حوزه ارزیابی *</label><input name="domain" class="form-control" placeholder="کیفیت / انضباط / مشتری" required></div>
+<div class="col-lg-3 col-md-6"><label class="form-label">توضیحات</label><input name="description" class="form-control" placeholder="شرح و راهنمای ارزیابی"></div>
+<div class="col-12 d-flex justify-content-end"><button class="btn btn-main px-4">ثبت سؤال</button></div></form></div>
+<div class="table-panel mb-4"><div class="panel-title"><div><h4>اتصال سؤال به رده پستی</h4><span>یک سؤال می‌تواند در رده‌های مختلف با سقف امتیاز مستقل استفاده شود.</span></div></div>
+<form method="post" action="/Setup/AssignQuestion" class="row g-3">@Html.AntiForgeryToken()
+<div class="col-lg-4"><label class="form-label">سؤال *</label><select name="questionId" class="form-select" required><option value="">انتخاب سؤال</option>@foreach(var q in Model.Questions.Where(x=>x.IsActive)){<option value="@q.Id">@q.Code — @q.Title</option>}</select></div>
+<div class="col-lg-3"><label class="form-label">رده پستی *</label><select name="positionId" class="form-select" required><option value="">انتخاب رده</option>@foreach(var p in Model.Positions.Where(x=>x.IsActive)){<option value="@p.Id">@p.Code — @p.Title</option>}</select></div>
+<div class="col-lg-2"><label class="form-label">سقف امتیاز *</label><input name="maxScore" class="form-control" type="number" min=".01" step=".01" required></div>
+<div class="col-lg-2"><label class="form-label">ترتیب</label><input name="sortOrder" class="form-control" type="number" min="1" value="1"></div>
+<div class="col-lg-1 d-flex align-items-end"><button class="btn btn-main w-100" title="اتصال">+</button></div></form></div>
+<div class="toolbar"><input class="form-control table-search" data-table-filter="#questions" placeholder="جست‌وجوی کد، عنوان یا حوزه..."><span class="form-hint">تعداد: @Model.Questions.Count</span></div>
+<div class="table-panel"><div class="table-responsive"><table id="questions" class="table modern-table"><thead><tr><th>کد</th><th>عنوان</th><th>حوزه</th><th>توضیحات</th><th>اتصال‌ها</th><th>رده / سقف</th><th>وضعیت</th></tr></thead><tbody>@foreach(var q in Model.Questions){<tr><td><span class="code-chip">@q.Code</span></td><td class="fw-bold">@q.Title</td><td><span class="domain-chip">@q.Domain</span></td><td class="text-muted">@(q.Description??"—")</td><td>@q.PositionMappings.Count(x=>x.IsActive)</td><td>@if(q.PositionMappings.Any(x=>x.IsActive)){foreach(var m in q.PositionMappings.Where(x=>x.IsActive).OrderBy(x=>x.Position?.Title)){<div class="mapping-line"><span>@m.Position?.Title</span><b>@m.MaxScore</b><form method="post" action="/Setup/RemoveQuestion" class="inline-form">@Html.AntiForgeryToken()<input type="hidden" name="mappingId" value="@m.Id"><button class="link-danger">حذف</button></form></div>}}else{<span class="text-muted">بدون اتصال</span>}</td><td><span class="status-dot @(q.IsActive?"":"off")"></span></td></tr>}</tbody></table></div></div>
