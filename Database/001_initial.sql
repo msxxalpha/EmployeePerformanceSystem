@@ -37,16 +37,29 @@ CREATE TABLE Positions(
     CONSTRAINT CK_Positions_MaxScore_NonNegative CHECK(MaxScore >= 0)
 );
 
+CREATE TABLE EvaluationDomains(
+    Id INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_EvaluationDomains PRIMARY KEY,
+    Code NVARCHAR(50) NOT NULL,
+    Title NVARCHAR(200) NOT NULL,
+    Description NVARCHAR(1000) NULL,
+    SortOrder INT NOT NULL CONSTRAINT DF_EvaluationDomains_SortOrder DEFAULT 1,
+    IsActive BIT NOT NULL CONSTRAINT DF_EvaluationDomains_IsActive DEFAULT 1,
+    CONSTRAINT UQ_EvaluationDomains_Code UNIQUE(Code),
+    CONSTRAINT CK_EvaluationDomains_SortOrder_Positive CHECK(SortOrder > 0)
+);
+
 CREATE TABLE Questions(
     Id INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_Questions PRIMARY KEY,
     Code NVARCHAR(50) NOT NULL,
     Title NVARCHAR(250) NOT NULL,
-    Domain NVARCHAR(150) NOT NULL,
+    DomainId INT NOT NULL,
     Description NVARCHAR(1000) NULL,
     Text NVARCHAR(1000) NOT NULL,
     IsActive BIT NOT NULL CONSTRAINT DF_Questions_IsActive DEFAULT 1,
     CONSTRAINT UQ_Questions_Code UNIQUE(Code)
 );
+
+ALTER TABLE Questions ADD CONSTRAINT FK_Questions_EvaluationDomain FOREIGN KEY(DomainId) REFERENCES EvaluationDomains(Id) ON DELETE RESTRICT;
 
 CREATE TABLE PositionQuestions(
     Id INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PositionQuestions PRIMARY KEY,
