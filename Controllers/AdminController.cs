@@ -95,7 +95,7 @@ public class AdminController(AppDbContext db, ExcelService excel, PerformanceSer
 
         var employee = await db.Employees.AsNoTracking().Include(x => x.Position).Include(x => x.Unit).SingleOrDefaultAsync(x => x.Id == ev.EmployeeId);
         var evaluator = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.Id == ev.EvaluatorId);
-        var questions = await db.Questions.AsNoTracking().Where(x => ev.Scores.Select(s => s.QuestionId).Contains(x.Id)).ToDictionaryAsync(x => x.Id);
+        var questions = await db.Questions.AsNoTracking().Include(x => x.EvaluationDomain).Where(x => ev.Scores.Select(s => s.QuestionId).Contains(x.Id)).ToDictionaryAsync(x => x.Id);
         var history = await db.ScoreHistory.AsNoTracking().Where(x => x.EvaluationId == id)
             .Join(db.Questions, h => h.QuestionId, q => q.Id, (h,q) => new HistoryAdminRow(q.Title,h.OldScore,h.NewScore,h.ChangedBy,h.ChangedAt,h.Reason))
             .OrderByDescending(x => x.ChangedAt).ToListAsync();
@@ -104,7 +104,7 @@ public class AdminController(AppDbContext db, ExcelService excel, PerformanceSer
             ev.Scores.OrderBy(x => questions.GetValueOrDefault(x.QuestionId)?.Title).Select(s => new ScoreAdminRow(
                 questions.GetValueOrDefault(s.QuestionId)?.Code ?? ("Q" + s.QuestionId),
                 questions.GetValueOrDefault(s.QuestionId)?.Title ?? ("سؤال " + s.QuestionId),
-                questions.GetValueOrDefault(s.QuestionId)?.Domain ?? "—",
+                questions.GetValueOrDefault(s.QuestionId)?.EvaluationDomain?.Title ?? "—",
                 s.Score, s.MaxScore, s.Comment)).ToList(), history));
     }
 
@@ -116,7 +116,7 @@ public class AdminController(AppDbContext db, ExcelService excel, PerformanceSer
         await ps.SyncExpiredPeriodsAsync();
         p = await db.Periods.FindAsync(id);
         if (p == null) return NotFound();
-        return View(new PeriodEditVm(p.Id, p.Title, p.StartJalali, p.EndJalali, p.Description, p.IsOpen && p.EndAt >= DateTime.Now));
+        return View("PeriodEdit", new PeriodEditVm(p.Id, p.Title, p.StartJalali, p.EndJalali, p.Description, p.IsOpen && p.EndAt >= DateTime.Now));
     }
 
     [HttpPost, ValidateAntiForgeryToken]
@@ -188,7 +188,7 @@ public class AdminController(AppDbContext db, ExcelService excel, PerformanceSer
     [HttpGet]
     public async Task<IActionResult> CreateEmployee()
     {
-        return View(await BuildEmployeeFormVm());
+        return View("EmployeeForm", await BuildEmployeeFormVm());
     }
 
     [HttpPost, ValidateAntiForgeryToken]
@@ -257,7 +257,7 @@ public class AdminController(AppDbContext db, ExcelService excel, PerformanceSer
     {
         var e = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id);
         if (e == null) return NotFound();
-        return View(await BuildEmployeeFormVm(e));
+        return View("EmployeeForm", await BuildEmployeeFormVm(e));
     }
 
     [HttpPost, ValidateAntiForgeryToken]
