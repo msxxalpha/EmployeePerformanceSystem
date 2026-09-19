@@ -10,7 +10,7 @@ namespace Indamin.Performance.Controllers;
 public class SetupController(AppDbContext db, ExcelService excel) : Controller
 {
     public async Task<IActionResult> Positions() =>
-        View(await db.Positions.Include(x => x.QuestionMappings).ThenInclude(x => x.Question).ThenInclude(x => x.EvaluationDomain).OrderBy(x => x.Title).ToListAsync());
+        View(await db.Positions.Include(x => x.QuestionMappings).ThenInclude(x => x.Question!).ThenInclude(x => x.EvaluationDomain).OrderBy(x => x.Title).ToListAsync());
 
     public async Task<IActionResult> Questions() =>
         View(new QuestionsVm(
@@ -227,7 +227,7 @@ public class SetupController(AppDbContext db, ExcelService excel) : Controller
     }
 
     [HttpGet] public async Task<IActionResult> ExportPositions(){var rows=await db.Positions.Include(x=>x.QuestionMappings).AsNoTracking().OrderBy(x=>x.Title).ToListAsync();return File(excel.Positions(rows),"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","Positions.xlsx");}
-    [HttpGet] public async Task<IActionResult> ExportQuestions(){var rows=await db.Questions.Include(x=>x.PositionMappings).AsNoTracking().OrderBy(x=>x.Domain).ThenBy(x=>x.Title).ToListAsync();return File(excel.Questions(rows),"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","Questions.xlsx");}
+    [HttpGet] public async Task<IActionResult> ExportQuestions(){var rows=await db.Questions.Include(x=>x.PositionMappings).AsNoTracking().OrderBy(x=>x.EvaluationDomain!.SortOrder).ThenBy(x=>x.Title).ToListAsync();return File(excel.Questions(rows),"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","Questions.xlsx");}
     [HttpGet] public async Task<IActionResult> ExportOrgUnits(){var rows=await db.OrgUnits.AsNoTracking().OrderBy(x=>x.Title).ToListAsync();return File(excel.OrgUnits(rows),"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","OrgUnits.xlsx");}
 
     public record QuestionsVm(List<Question> Questions, List<Position> Positions, List<EvaluationDomain> Domains);
