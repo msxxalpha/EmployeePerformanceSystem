@@ -365,12 +365,14 @@ public class AdminController(AppDbContext db, ExcelService excel, PerformanceSer
         if (employee == null) return NotFound();
 
         var user = await db.Users.AsNoTracking().SingleOrDefaultAsync(x => x.EmployeeId == id);
-        return View(new AdminChangePasswordVm(
-            employee.Id,
-            employee.FullName,
-            employee.PersonnelNo,
-            user != null,
-            employee.IsActive));
+        return View(new AdminChangePasswordVm
+        {
+            EmployeeId = employee.Id,
+            EmployeeName = employee.FullName,
+            PersonnelNo = employee.PersonnelNo,
+            HasUser = user != null,
+            EmployeeIsActive = employee.IsActive
+        });
     }
 
     [HttpPost, ValidateAntiForgeryToken]
@@ -508,8 +510,13 @@ public class AdminController(AppDbContext db, ExcelService excel, PerformanceSer
         public void Normalize() { PersonnelNo = PersonnelNo.Trim(); NationalNo = NationalNo.Trim(); FullName = FullName.Trim(); Mobile = string.IsNullOrWhiteSpace(Mobile) ? null : Mobile.Trim(); }
     }
 
-    public record AdminChangePasswordVm(int EmployeeId, string EmployeeName, string PersonnelNo, bool HasUser, bool EmployeeIsActive)
+    public class AdminChangePasswordVm
     {
+        public int EmployeeId { get; set; }
+        public string EmployeeName { get; set; } = "";
+        public string PersonnelNo { get; set; } = "";
+        public bool HasUser { get; set; }
+        public bool EmployeeIsActive { get; set; }
         public string NewPassword { get; set; } = "";
         public string ConfirmPassword { get; set; } = "";
     }
