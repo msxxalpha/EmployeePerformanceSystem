@@ -240,7 +240,7 @@ public class EvaluationController(AppDbContext db, PerformanceService ps, ExcelS
         await db.PositionQuestions.AsNoTracking()
             .Where(x => x.PositionId == positionId && x.IsActive && x.Question != null && x.Question.IsActive)
             .OrderBy(x => x.SortOrder).ThenBy(x => x.Id)
-            .Select(x => new EvalQuestionVm(x.QuestionId, x.Question!.Code, x.Question.Title, x.Question.Domain, x.Question.Description, x.MaxScore, x.SortOrder, 0, null))
+            .Select(x => new EvalQuestionVm(x.QuestionId, x.Question!.Code, x.Question.Title, x.Question.EvaluationDomain!.Title, x.Question.Description, x.MaxScore, x.SortOrder, 0, null))
             .ToListAsync();
 
     private async Task<List<HistoryRow>> History(int id) =>
