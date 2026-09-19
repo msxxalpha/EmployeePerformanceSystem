@@ -20,6 +20,7 @@ public class HierarchyAndEvaluationTests
     private static void AddMasterData(AppDbContext db)
     {
         db.Positions.Add(new Position { Id = 1, Code = "P1", Title = "رده 1" });
+        db.EvaluationDomains.Add(new EvaluationDomain { Id = 1, Code = "D1", Title = "کیفیت" });
         db.Positions.Add(new Position { Id = 2, Code = "P2", Title = "رده 2" });
         db.OrgUnits.Add(new OrgUnit { Id = 1, Code = "U1", Title = "واحد 1" });
     }
@@ -107,7 +108,7 @@ public class HierarchyAndEvaluationTests
     public async Task QuestionCanHaveDifferentMaxScoresPerPosition()
     {
         var (db, service) = CreateDb(); AddMasterData(db);
-        db.Questions.Add(new Question{Id=1,Code="Q1",Title="Q",Domain="کیفیت",Text="Q",IsActive=true});
+        db.Questions.Add(new Question{Id=1,Code="Q1",Title="Q",DomainId=1,Text="Q",IsActive=true});
         db.PositionQuestions.AddRange(
             new PositionQuestion{Id=1,PositionId=1,QuestionId=1,MaxScore=10,SortOrder=1},
             new PositionQuestion{Id=2,PositionId=2,QuestionId=1,MaxScore=25,SortOrder=1});
@@ -131,7 +132,7 @@ public class HierarchyAndEvaluationTests
     public async Task FinalScoreIsTheSumOfQuestionScores()
     {
         var (db, service) = CreateDb(); AddMasterData(db);
-        db.Questions.AddRange(new Question{Id=1,Code="Q1",Title="Q1",Domain="کیفیت"},new Question{Id=2,Code="Q2",Title="Q2",Domain="انضباط"});
+        db.Questions.AddRange(new Question{Id=1,Code="Q1",Title="Q1",DomainId=1},new Question{Id=2,Code="Q2",Title="Q2",DomainId=1});
         db.Evaluations.Add(new Evaluation{Id=9,PeriodId=1,EmployeeId=1,EvaluatorId=1,OriginalEvaluatorId=1});
         db.Scores.AddRange(new EvaluationScore{EvaluationId=9,QuestionId=1,Score=7,MaxScore=10},new EvaluationScore{EvaluationId=9,QuestionId=2,Score=3,MaxScore=5});
         await db.SaveChangesAsync();
