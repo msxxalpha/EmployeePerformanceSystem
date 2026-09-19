@@ -8,6 +8,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<OrgUnit> OrgUnits => Set<OrgUnit>();
     public DbSet<Position> Positions => Set<Position>();
     public DbSet<Question> Questions => Set<Question>();
+    public DbSet<EvaluationDomain> EvaluationDomains => Set<EvaluationDomain>();
     public DbSet<PositionQuestion> PositionQuestions => Set<PositionQuestion>();
     public DbSet<Employee> Employees => Set<Employee>();
     public DbSet<EvaluationPeriod> Periods => Set<EvaluationPeriod>();
@@ -23,6 +24,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         b.Entity<OrgUnit>().ToTable("OrgUnits");
         b.Entity<Position>().ToTable("Positions");
         b.Entity<Question>().ToTable("Questions");
+        b.Entity<EvaluationDomain>().ToTable("EvaluationDomains");
+        b.Entity<EvaluationDomain>().HasIndex(x => x.Code).IsUnique();
         b.Entity<PositionQuestion>().ToTable("PositionQuestions");
         b.Entity<Employee>().ToTable("Employees");
         b.Entity<EvaluationPeriod>().ToTable("EvaluationPeriods");
@@ -36,6 +39,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         b.Entity<Employee>().HasIndex(x => x.PersonnelNo).IsUnique();
         b.Entity<Employee>().HasIndex(x => x.NationalNo).IsUnique();
         b.Entity<Question>().Property(x => x.Code).HasMaxLength(50);
+        b.Entity<EvaluationDomain>().Property(x => x.Code).HasMaxLength(50);
+        b.Entity<EvaluationDomain>().Property(x => x.Title).HasMaxLength(200);
+        b.Entity<EvaluationDomain>().Property(x => x.SortOrder).IsRequired();
 
         b.Entity<AppUser>()
             .HasOne<Employee>().WithMany()
@@ -64,6 +70,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .HasOne(x => x.Position).WithMany(x => x.QuestionMappings)
             .HasForeignKey(x => x.PositionId)
             .OnDelete(DeleteBehavior.Cascade);
+        b.Entity<Question>()
+            .HasOne(x => x.EvaluationDomain).WithMany()
+            .HasForeignKey(x => x.DomainId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         b.Entity<PositionQuestion>()
             .HasOne(x => x.Question).WithMany(x => x.PositionMappings)
             .HasForeignKey(x => x.QuestionId)
