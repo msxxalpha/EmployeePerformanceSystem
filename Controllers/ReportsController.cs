@@ -16,24 +16,19 @@ public class ReportsController(AppDbContext db, ExcelService excel) : Controller
     {
         var periods = await db.Periods.AsNoTracking().OrderByDescending(x => x.StartAt).ToListAsync();
         var selectable = periods.Where(x => x.StartAt <= DateTime.Now).ToList();
-        var selectedId = periodId.HasValue && selectable.Any(x => x.Id == periodId.Value)
+        int? selectedId = periodId.HasValue && selectable.Any(x => x.Id == periodId.Value)
             ? periodId.Value
             : selectable.FirstOrDefault()?.Id;
-
-        var report = selectedId.HasValue
-            ? await BuildReport(selectedId.Value)
-            : EmptyReport();
-
-        return View(new ReportVm(periods, selectedId, report, await QueryRows(selectedId ?? 0)));
+        var report = selectedId.HasValue ? await BuildReport(selectedId.Value) : EmptyReport();
+        var rows = selectedId.HasValue ? await QueryRows(selectedId.Value) : [];
+        return View(new ReportVm(periods, selectedId, report, rows));
     }
 
     [HttpGet]
     public async Task<IActionResult> Export(int? periodId)
     {
         var selectable = await db.Periods.AsNoTracking().Where(x => x.StartAt <= DateTime.Now).OrderByDescending(x => x.StartAt).ToListAsync();
-        var selectedId = periodId.HasValue && selectable.Any(x => x.Id == periodId.Value)
-            ? periodId.Value
-            : selectable.FirstOrDefault()?.Id ?? 0;
+        var selectedId = periodId.HasValue && selectable.Any(x => x.Id == periodId.Value) ? periodId.Value : selectable.FirstOrDefault()?.Id ?? 0;
         var rows = await QueryRows(selectedId);
         return File(excel.Evaluations(rows.Select(x => (x.Employee, x.Evaluator, x.Unit, x.Position, x.Score, x.Max, x.Status))), ExcelMime, "ManagementEvaluationReport.xlsx");
     }
@@ -43,7 +38,6 @@ public class ReportsController(AppDbContext db, ExcelService excel) : Controller
         var period = await db.Periods.AsNoTracking().SingleOrDefaultAsync(x => x.Id == periodId);
         var rows = await QueryRows(periodId);
         if (period == null) return EmptyReport();
-
         var evaluated = rows.Where(x => x.Max > 0).ToList();
         var percentages = evaluated.Select(x => Percent(x.Score, x.Max)).ToList();
         var avg = percentages.Count == 0 ? 0 : Math.Round(percentages.Average(), 1);
@@ -57,18 +51,15 @@ public class ReportsController(AppDbContext db, ExcelService excel) : Controller
             select new { s.QuestionId, q.Title, Domain = d.Title, s.Score, s.MaxScore })
             .ToListAsync();
 
-        var questionAverages = questionScores
-            .GroupBy(x => new { x.QuestionId, x.Title, x.Domain })
+        var questionAverages = questionScores.GroupBy(x => new { x.QuestionId, x.Title, x.Domain })
             .Select(g => new QuestionReportRow(g.Key.Title, g.Key.Domain, Math.Round(g.Average(x => x.MaxScore == 0 ? 0 : x.Score * 100 / x.MaxScore), 1), g.Count()))
             .OrderByDescending(x => x.AveragePercentage).ToList();
 
-        var domainAverages = questionScores
-            .GroupBy(x => x.Domain)
+        var domainAverages = questionScores.GroupBy(x => x.Domain)
             .Select(g => new DomainReportRow(g.Key, Math.Round(g.Average(x => x.MaxScore == 0 ? 0 : x.Score * 100 / x.MaxScore), 1), g.Count()))
             .OrderByDescending(x => x.AveragePercentage).ToList();
 
-        var unitAverages = evaluated
-            .GroupBy(x => x.Unit)
+        var unitAverages = evaluated.GroupBy(x => x.Unit)
             .Select(g => new UnitReportRow(g.Key, g.Count(), Math.Round(g.Average(x => Percent(x.Score, x.Max)), 1)))
             .OrderByDescending(x => x.AveragePercentage).ToList();
 
@@ -85,24 +76,19 @@ public class ReportsController(AppDbContext db, ExcelService excel) : Controller
 
         var activeEmployees = await db.Employees.CountAsync(x => x.IsActive);
         var completion = activeEmployees == 0 ? 0 : Math.Round(evaluated.Count * 100m / activeEmployees, 1);
-
-        return new ReportData(
-            period, rows.Count, evaluated.Count, avg, completion,
-            tops, lows, questionAverages, domainAverages, unitAverages, distribution);
+        return new ReportData(period, rows.Count, evaluated.Count, avg, completion, tops, lows, questionAverages, domainAverages, unitAverages, distribution);
     }
 
-    private async Task<List<Row>> QueryRows(int periodId) =>
-        await (
+    private Task<List<Row>> QueryRows(int periodId) =>
+        (
             from ev in db.Evaluations.AsNoTracking()
             join employee in db.Employees.AsNoTracking() on ev.EmployeeId equals employee.Id
             join evaluator in db.Employees.AsNoTracking() on ev.EvaluatorId equals evaluator.Id
             join unit in db.OrgUnits.AsNoTracking() on employee.UnitId equals unit.Id
             join position in db.Positions.AsNoTracking() on employee.PositionId equals position.Id
             where ev.PeriodId == periodId
-            select new Row(
-                employee.FullName, evaluator.FullName, unit.Title, position.Title,
-                ev.FinalScore, ev.FinalMaxScore, ev.Status.ToString()))
-            .OrderBy(x => x.Employee).ToListAsync();
+            select new Row(employee.FullName, evaluator.FullName, unit.Title, position.Title, ev.FinalScore, ev.FinalMaxScore, ev.Status.ToString())
+        ).OrderBy(x => x.Employee).ToListAsync();
 
     private static decimal Percent(decimal score, decimal max) => max <= 0 ? 0 : Math.Round(score * 100 / max, 1);
     private static ReportData EmptyReport() => new(null, 0, 0, 0, 0, [], [], [], [], [], new DistributionReport(0, 0, 0, 0));
