@@ -359,6 +359,69 @@ public class AdminController(AppDbContext db, ExcelService excel, PerformanceSer
     }
 
     [HttpGet]
+    public async Task<IActionResult> ChangePassword(int id)
+    {
+        var employee = await db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id);
+        if (employee == null) return NotFound();
+
+        var user = await db.Users.AsNoTracking().SingleOrDefaultAsync(x => x.EmployeeId == id);
+        return View(new AdminChangePasswordVm(
+            employee.Id,
+            employee.FullName,
+            employee.PersonnelNo,
+            user != null,
+            employee.IsActive));
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> ChangePassword(AdminChangePasswordVm model)
+    {
+        if (string.IsNullOrWhiteSpace(model.NewPassword) || string.IsNullOrWhiteSpace(model.ConfirmPassword))
+        {
+            ModelState.AddModelError("", "تکمیل رمز عبور جدید و تکرار آن الزامی است.");
+            return View(model);
+        }
+        if (model.NewPassword.Length < 8)
+        {
+            ModelState.AddModelError(nameof(model.NewPassword), "رمز عبور جدید باید حداقل ۸ کاراکتر باشد.");
+            return View(model);
+        }
+        if (model.NewPassword != model.ConfirmPassword)
+        {
+            ModelState.AddModelError(nameof(model.ConfirmPassword), "تکرار رمز عبور جدید با آن یکسان نیست.");
+            return View(model);
+        }
+
+        var employee = await db.Employees.SingleOrDefaultAsync(x => x.Id == model.EmployeeId);
+        if (employee == null) return NotFound();
+
+        var user = await db.Users.SingleOrDefaultAsync(x => x.EmployeeId == employee.Id);
+        if (user == null)
+        {
+            user = new AppUser
+            {
+                UserName = employee.PersonnelNo,
+                DisplayName = employee.FullName,
+                EmployeeId = employee.Id,
+                IsAdmin = false,
+                IsActive = employee.IsActive,
+                PasswordHash = PasswordHasher.Hash(model.NewPassword)
+            };
+            db.Users.Add(user);
+        }
+        else
+        {
+            user.UserName = employee.PersonnelNo;
+            user.DisplayName = employee.FullName;
+            user.PasswordHash = PasswordHasher.Hash(model.NewPassword);
+        }
+
+        await db.SaveChangesAsync();
+        TempData["Result"] = $"رمز عبور «{employee.FullName}» با موفقیت تغییر کرد.";
+        return RedirectToAction(nameof(Employees));
+    }
+
+    [HttpGet]
     public IActionResult ImportEmployees() => View();
 
     [HttpPost, ValidateAntiForgeryToken]
@@ -443,6 +506,12 @@ public class AdminController(AppDbContext db, ExcelService excel, PerformanceSer
         public int? SupervisorId { get; set; }
         public bool IsActive { get; set; } = true;
         public void Normalize() { PersonnelNo = PersonnelNo.Trim(); NationalNo = NationalNo.Trim(); FullName = FullName.Trim(); Mobile = string.IsNullOrWhiteSpace(Mobile) ? null : Mobile.Trim(); }
+    }
+
+    public record AdminChangePasswordVm(int EmployeeId, string EmployeeName, string PersonnelNo, bool HasUser, bool EmployeeIsActive)
+    {
+        public string NewPassword { get; set; } = "";
+        public string ConfirmPassword { get; set; } = "";
     }
 
     public record EvaluationDetailsVm(Evaluation Evaluation, Employee? Employee, string Evaluator, List<ScoreAdminRow> Scores, List<HistoryAdminRow> History);
