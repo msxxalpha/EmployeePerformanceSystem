@@ -1,5 +1,57 @@
-@model List<Indamin.Performance.Controllers.ReportsController.Row>
-@{ViewData["Title"]="گزارش ارزیابی";}
-<div class="page-header"><div><div class="eyebrow">گزارش مدیریتی</div><h2>نتایج ارزیابی</h2><p class="text-muted">نتایج دوره منتخب، قابل جست‌وجو، مرتب‌سازی و دریافت در Excel.</p></div><a class="btn btn-main" href="/Reports/Export?periodId=@ViewBag.PeriodId">خروجی Excel</a></div>
-<div class="toolbar"><form method="get" class="d-flex gap-2 align-items-center flex-wrap"><select name="periodId" class="form-select" style="min-width:220px" onchange="this.form.submit()"><option value="">انتخاب دوره</option>@foreach(var p in (List<EvaluationPeriod>)ViewBag.Periods){<option value="@p.Id" selected="@(p.Id==(int)ViewBag.PeriodId)">@p.Title</option>}</select></form><input class="form-control table-search" style="max-width:340px" data-table-filter="#reports" placeholder="جستجوی کارمند، ارزیاب، واحد یا رده..."></div>
-<div class="table-panel"><div class="table-responsive"><table id="reports" class="table modern-table"><thead><tr><th>کارمند</th><th>ارزیاب</th><th>واحد</th><th>رده</th><th>امتیاز</th><th>سقف</th><th>درصد</th><th>وضعیت</th></tr></thead><tbody>@foreach(var x in Model){<tr><td class="fw-bold">@x.Employee</td><td>@x.Evaluator</td><td>@x.Unit</td><td>@x.Position</td><td>@x.Score</td><td>@x.Max</td><td><span class="score-pill">@(x.Max==0?0:Math.Round(x.Score*100/x.Max,1))٪</span></td><td>@x.Status</td></tr>}</tbody></table></div></div>
+@model ReportsController.ReportVm
+@{
+    ViewData["Title"]="گزارش‌های مدیریتی";
+    var d=Model.Data;
+}
+<div class="page-header">
+ <div><div class="eyebrow">مدیریت و تحلیل</div><h2>گزارش‌های مدیریتی عملکرد</h2><p class="text-muted">تحلیل دوره منتخب بر اساس امتیاز نهایی، حوزه ارزیابی، سؤال، واحد سازمانی و توزیع عملکرد.</p></div>
+ <div class="toolbar-actions">@if(Model.SelectedPeriodId.HasValue){<a class="btn btn-main" href="/Reports/Export?periodId=@Model.SelectedPeriodId">خروجی Excel</a>}</div>
+</div>
+<div class="report-period-selector">
+ <div><span>دوره منتخب</span><strong>@(d.Period?.Title??"هیچ دوره‌ای انتخاب نشده است")</strong>@if(d.Period!=null){<small>@d.Period.StartJalali تا @d.Period.EndJalali · @(d.Period.EndAt<DateTime.Now?"بسته":"در حال اجرا")</small>}</div>
+ <form method="get"><label class="form-label">انتخاب دوره</label><select name="periodId" class="form-select" onchange="this.form.submit()">
+  <option value="">انتخاب دوره</option>
+  @foreach(var p in Model.Periods.Where(x=>x.StartAt<=DateTime.Now)){ if(Model.SelectedPeriodId==p.Id){<option value="@p.Id" selected>@p.Title</option>}else{<option value="@p.Id">@p.Title</option>} }
+ </select></form>
+</div>
+@if(d.Period==null){<div class="empty-state report-empty"><div class="display-6">▥</div><strong>هنوز دوره‌ای برای گزارش انتخاب نشده است.</strong></div>}
+else{
+<div class="row g-3 mb-4">
+ <div class="col-xl-3 col-md-6"><div class="metric-card metric-main"><span>ارزیابی ثبت‌شده</span><strong>@d.EvaluatedCount</strong><small>از @d.RowCount رکورد دوره</small></div></div>
+ <div class="col-xl-3 col-md-6"><div class="metric-card"><span>میانگین عملکرد</span><strong>@d.AveragePercentage.ToString("0.0")٪</strong><small>درصد از سقف امتیاز</small></div></div>
+ <div class="col-xl-3 col-md-6"><div class="metric-card"><span>پوشش ارزیابی</span><strong>@d.CompletionPercentage.ToString("0.0")٪</strong><small>نسبت ارزیابی به کارکنان فعال</small></div></div>
+ <div class="col-xl-3 col-md-6"><div class="metric-card"><span>سؤال‌های تحلیل‌شده</span><strong>@d.QuestionAverages.Count</strong><small>در این دوره</small></div></div>
+</div>
+<div class="row g-3 mb-4">
+ <div class="col-xl-7"><div class="card chart-card"><div class="card-title-row"><div><h5>نفرات با بالاترین امتیاز</h5><span>بر اساس درصد امتیاز نهایی</span></div></div>
+ @if(!d.TopPerformers.Any()){<div class="empty-inline">داده‌ای وجود ندارد.</div>}else{<div class="ranking-list">@foreach(var x in d.TopPerformers){<div class="ranking-row"><span class="rank-num">@((d.TopPerformers.IndexOf(x)+1))</span><div class="rank-main"><b>@x.Name</b><small>@x.Unit</small><div class="progress"><div class="progress-bar" style="width:@x.Percentage%"></div></div></div><strong>@x.Percentage٪</strong></div>}</div>}
+ </div></div>
+ <div class="col-xl-5"><div class="card chart-card"><div class="card-title-row"><div><h5>توزیع سطح عملکرد</h5><span>تعداد افراد در چهار بازه درصدی</span></div></div>
+ <div class="distribution-list">
+  <div class="dist-row"><span>۹۰٪ و بیشتر</span><b>@d.Distribution.Excellent</b><div class="dist-track"><div class="dist-fill" style="width:@(d.EvaluatedCount==0?0:d.Distribution.Excellent*100m/d.EvaluatedCount)%"></div></div></div>
+  <div class="dist-row"><span>۷۵٪ تا ۸۹.۹٪</span><b>@d.Distribution.Good</b><div class="dist-track"><div class="dist-fill" style="width:@(d.EvaluatedCount==0?0:d.Distribution.Good*100m/d.EvaluatedCount)%"></div></div></div>
+  <div class="dist-row"><span>۶۰٪ تا ۷۴.۹٪</span><b>@d.Distribution.Moderate</b><div class="dist-track"><div class="dist-fill" style="width:@(d.EvaluatedCount==0?0:d.Distribution.Moderate*100m/d.EvaluatedCount)%"></div></div></div>
+  <div class="dist-row"><span>کمتر از ۶۰٪</span><b>@d.Distribution.NeedsImprovement</b><div class="dist-track"><div class="dist-fill" style="width:@(d.EvaluatedCount==0?0:d.Distribution.NeedsImprovement*100m/d.EvaluatedCount)%"></div></div></div>
+ </div></div></div>
+</div>
+<div class="row g-3 mb-4">
+ <div class="col-xl-6"><div class="card chart-card"><div class="card-title-row"><div><h5>میانگین عملکرد به تفکیک حوزه</h5><span>نرمال‌شده بر اساس سقف هر سؤال</span></div></div>
+ @if(!d.DomainAverages.Any()){<div class="empty-inline">داده‌ای وجود ندارد.</div>}else{<div class="area-list">@foreach(var x in d.DomainAverages){<div class="area-row"><div><span>@x.Domain</span><b>@x.AveragePercentage.ToString("0.0")٪</b></div><div class="progress"><div class="progress-bar" style="width:@x.AveragePercentage%"></div></div><small>@x.Responses پاسخ</small></div>}</div>}</div></div>
+ <div class="col-xl-6"><div class="card chart-card"><div class="card-title-row"><div><h5>میانگین عملکرد واحدها</h5><span>مقایسه میانگین درصد امتیاز نهایی کارکنان هر واحد</span></div></div>
+ @if(!d.UnitAverages.Any()){<div class="empty-inline">داده‌ای وجود ندارد.</div>}else{<div class="area-list">@foreach(var x in d.UnitAverages){<div class="area-row"><div><span>@x.Unit</span><b>@x.AveragePercentage.ToString("0.0")٪</b></div><div class="progress"><div class="progress-bar" style="width:@x.AveragePercentage%"></div></div><small>@x.EvaluatedCount نفر ارزیابی‌شده</small></div>}</div>}</div></div>
+</div>
+<div class="row g-3 mb-4">
+ <div class="col-xl-7"><div class="card chart-card"><div class="card-title-row"><div><h5>نقاط نیازمند بهبود</h5><span>افراد با پایین‌ترین درصد امتیاز نهایی</span></div></div>
+ @if(!d.ImprovementPeople.Any()){<div class="empty-inline">داده‌ای وجود ندارد.</div>}else{<div class="ranking-list">@foreach(var x in d.ImprovementPeople){<div class="ranking-row"><div class="rank-main"><b>@x.Name</b><small>@x.Unit</small><div class="progress"><div class="progress-bar" style="width:@x.Percentage%"></div></div></div><strong>@x.Percentage٪</strong></div>}</div>}</div></div>
+ <div class="col-xl-5"><div class="card chart-card"><div class="card-title-row"><div><h5>میانگین سؤال‌ها</h5><span>سؤال‌ها به ترتیب میانگین عملکرد</span></div></div>
+ @if(!d.QuestionAverages.Any()){<div class="empty-inline">داده‌ای وجود ندارد.</div>}else{<div class="area-list">@foreach(var x in d.QuestionAverages.Take(10)){<div class="area-row"><div><span>@x.Title</span><b>@x.AveragePercentage٪</b></div><div class="progress"><div class="progress-bar" style="width:@x.AveragePercentage%"></div></div><small>@x.Domain · @x.Responses پاسخ</small></div>}</div>}</div></div>
+</div>
+<div class="table-panel"><div class="panel-title"><div><h4>جزئیات نتایج دوره</h4><span>فیلتر، جست‌وجو و دریافت خروجی Excel.</span></div></div>
+<div class="toolbar"><input class="form-control table-search" data-table-filter="#reportTable" placeholder="جست‌وجوی کارمند، ارزیاب، واحد یا رده..."></div>
+<div class="table-responsive"><table id="reportTable" class="table modern-table"><thead><tr><th>کارمند</th><th>ارزیاب</th><th>واحد</th><th>رده</th><th>امتیاز</th><th>سقف</th><th>درصد</th><th>وضعیت</th></tr></thead><tbody>
+@foreach(var x in (await GetRows(Model.SelectedPeriodId))){<tr><td class="fw-bold">@x.Employee</td><td>@x.Evaluator</td><td>@x.Unit</td><td>@x.Position</td><td>@x.Score</td><td>@x.Max</td><td><span class="score-pill">@(x.Max==0?0:Math.Round(x.Score*100/x.Max,1))٪</span></td><td>@x.Status</td></tr>}
+</tbody></table></div></div>
+}
+@functions {
+ async Task<List<ReportsController.Row>> GetRows(int? id){ if(!id.HasValue)return []; return await Context.RequestServices.GetRequiredService<Indamin.Performance.Data.AppDbContext>().Evaluations.AsNoTracking().Where(x=>x.PeriodId==id).Join(Context.RequestServices.GetRequiredService<Indamin.Performance.Data.AppDbContext>().Employees,e=>e.Id,x=>x.EmployeeId,(e,x)=>new{x.e,e=x}).Join(Context.RequestServices.GetRequiredService<Indamin.Performance.Data.AppDbContext>().Employees,z=>z.e.EvaluatorId,a=>a.Id,(z,a)=>new{z.e,z.x,a}).Join(Context.RequestServices.GetRequiredService<Indamin.Performance.Data.AppDbContext>().OrgUnits,z=>z.x.UnitId,u=>u.Id,(z,u)=>new{z.e,z.x,z.a,u}).Join(Context.RequestServices.GetRequiredService<Indamin.Performance.Data.AppDbContext>().Positions,z=>z.x.PositionId,p=>p.Id).Select(z=>new ReportsController.Row(z.x.FullName,z.a.FullName,z.u.Title,z.p.Title,z.e.FinalScore,z.e.FinalMaxScore,z.e.Status.ToString())).ToListAsync(); }
+}
