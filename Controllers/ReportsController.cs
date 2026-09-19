@@ -23,7 +23,7 @@ public class ReportsController(AppDbContext db, ExcelService excel) : Controller
             ? await BuildReport(selectedId.Value)
             : EmptyReport();
 
-        return View(new ReportVm(periods, selectedId, report));
+        return View(new ReportVm(periods, selectedId, report, await QueryRows(selectedId ?? 0)));
     }
 
     [HttpGet]
@@ -106,7 +106,7 @@ public class ReportsController(AppDbContext db, ExcelService excel) : Controller
     private static decimal Percent(decimal score, decimal max) => max <= 0 ? 0 : Math.Round(score * 100 / max, 1);
     private static ReportData EmptyReport() => new(null, 0, 0, 0, 0, [], [], [], [], [], new DistributionReport(0, 0, 0, 0));
 
-    public record ReportVm(List<EvaluationPeriod> Periods, int? SelectedPeriodId, ReportData Data);
+    public record ReportVm(List<EvaluationPeriod> Periods, int? SelectedPeriodId, ReportData Data, List<Row> Rows);
     public record ReportData(EvaluationPeriod? Period, int RowCount, int EvaluatedCount, decimal AveragePercentage, decimal CompletionPercentage, List<PersonReportRow> TopPerformers, List<PersonReportRow> ImprovementPeople, List<QuestionReportRow> QuestionAverages, List<DomainReportRow> DomainAverages, List<UnitReportRow> UnitAverages, DistributionReport Distribution);
     public record Row(string Employee, string Evaluator, string Unit, string Position, decimal Score, decimal Max, string Status);
     public record PersonReportRow(string Name, string Unit, decimal Percentage);
