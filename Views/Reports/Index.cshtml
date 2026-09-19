@@ -9,9 +9,8 @@
 </div>
 <div class="report-period-selector">
  <div><span>دوره منتخب</span><strong>@(d.Period?.Title??"هیچ دوره‌ای انتخاب نشده است")</strong>@if(d.Period!=null){<small>@d.Period.StartJalali تا @d.Period.EndJalali · @(d.Period.EndAt<DateTime.Now?"بسته":"در حال اجرا")</small>}</div>
- <form method="get"><label class="form-label">انتخاب دوره</label><select name="periodId" class="form-select" onchange="this.form.submit()">
-  <option value="">انتخاب دوره</option>
-  @foreach(var p in Model.Periods.Where(x=>x.StartAt<=DateTime.Now)){ if(Model.SelectedPeriodId==p.Id){<option value="@p.Id" selected>@p.Title</option>}else{<option value="@p.Id">@p.Title</option>} }
+ <form method="get"><label class="form-label">انتخاب دوره</label><select name="periodId" class="form-select" onchange="this.form.submit()"><option value="">انتخاب دوره</option>
+ @foreach(var p in Model.Periods.Where(x=>x.StartAt<=DateTime.Now)){if(Model.SelectedPeriodId==p.Id){<option value="@p.Id" selected>@p.Title</option>}else{<option value="@p.Id">@p.Title</option>}}
  </select></form>
 </div>
 @if(d.Period==null){<div class="empty-state report-empty"><div class="display-6">▥</div><strong>هنوز دوره‌ای برای گزارش انتخاب نشده است.</strong></div>}
@@ -46,10 +45,9 @@ else{
  <div class="col-xl-5"><div class="card chart-card"><div class="card-title-row"><div><h5>میانگین سؤال‌ها</h5><span>سؤال‌ها به ترتیب میانگین عملکرد</span></div></div>
  @if(!d.QuestionAverages.Any()){<div class="empty-inline">داده‌ای وجود ندارد.</div>}else{<div class="area-list">@foreach(var x in d.QuestionAverages.Take(10)){<div class="area-row"><div><span>@x.Title</span><b>@x.AveragePercentage٪</b></div><div class="progress"><div class="progress-bar" style="width:@x.AveragePercentage%"></div></div><small>@x.Domain · @x.Responses پاسخ</small></div>}</div>}</div></div>
 </div>
-<div class="table-panel"><div class="panel-title"><div><h4>جزئیات نتایج دوره</h4><span>فیلتر، جست‌وجو و دریافت خروجی Excel.</span></div></div>
+<div class="table-panel"><div class="panel-title"><div><h4>جزئیات نتایج دوره</h4><span>فیلتر و جست‌وجوی سریع؛ خروجی Excel از بالای صفحه در دسترس است.</span></div></div>
 <div class="toolbar"><input class="form-control table-search" data-table-filter="#reportTable" placeholder="جست‌وجوی کارمند، ارزیاب، واحد یا رده..."></div>
 <div class="table-responsive"><table id="reportTable" class="table modern-table"><thead><tr><th>کارمند</th><th>ارزیاب</th><th>واحد</th><th>رده</th><th>امتیاز</th><th>سقف</th><th>درصد</th><th>وضعیت</th></tr></thead><tbody>
 @foreach(var x in Model.Rows){<tr><td class="fw-bold">@x.Employee</td><td>@x.Evaluator</td><td>@x.Unit</td><td>@x.Position</td><td>@x.Score</td><td>@x.Max</td><td><span class="score-pill">@(x.Max==0?0:Math.Round(x.Score*100/x.Max,1))٪</span></td><td>@x.Status</td></tr>}
 </tbody></table></div></div>
-).Join(Context.RequestServices.GetRequiredService<Indamin.Performance.Data.AppDbContext>().Employees,z=>z.e.EvaluatorId,a=>a.Id,(z,a)=>new{z.e,z.x,a}).Join(Context.RequestServices.GetRequiredService<Indamin.Performance.Data.AppDbContext>().OrgUnits,z=>z.x.UnitId,u=>u.Id,(z,u)=>new{z.e,z.x,z.a,u}).Join(Context.RequestServices.GetRequiredService<Indamin.Performance.Data.AppDbContext>().Positions,z=>z.x.PositionId,p=>p.Id).Select(z=>new ReportsController.Row(z.x.FullName,z.a.FullName,z.u.Title,z.p.Title,z.e.FinalScore,z.e.FinalMaxScore,z.e.Status.ToString())).ToListAsync(); }
 }
