@@ -120,7 +120,7 @@ public class HierarchyAndEvaluationTests
     public async Task EvaluationStoresQuestionMaxSnapshot()
     {
         var (db, service) = CreateDb(); AddMasterData(db);
-        db.Questions.Add(new Question{Id=1,Code="Q1",Title="Q",Domain="کیفیت",Text="Q"});
+        db.Questions.Add(new Question{Id=1,Code="Q1",Title="Q",DomainId=1,Text="Q"});
         db.PositionQuestions.Add(new PositionQuestion{Id=1,PositionId=1,QuestionId=1,MaxScore=10});
         db.Evaluations.Add(new Evaluation{Id=7,PeriodId=1,EmployeeId=1,EvaluatorId=1,OriginalEvaluatorId=1});
         db.Scores.Add(new EvaluationScore{Id=1,EvaluationId=7,QuestionId=1,Score=8,MaxScore=10});
