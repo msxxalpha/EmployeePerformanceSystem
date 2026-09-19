@@ -9,7 +9,7 @@ public static class DatabaseInitializer
         SELECT COUNT(*) AS [Value]
         FROM sys.tables
         WHERE name IN (
-            'AppUsers','OrgUnits','Positions','Questions','PositionQuestions',
+            'AppUsers','OrgUnits','Positions','EvaluationDomains','Questions','PositionQuestions',
             'Employees','EvaluationPeriods','Evaluations','EvaluationScores',
             'EvaluationScoreHistory','EvaluatorChangeHistory','AuditLogs'
         )
@@ -18,8 +18,8 @@ public static class DatabaseInitializer
     public static async Task InitializeAsync(AppDbContext db, string _)
     {
         var count = await db.Database.SqlQueryRaw<int>(RequiredTableSql).SingleAsync();
-        if (count != 12)
+        if (count != 13)
             throw new InvalidOperationException(
-                "ساختار پایگاه داده کامل نیست. ابتدا فقط فایل Database/001_initial.sql را روی پایگاه داده هدف اجرا کنید.");
+                "ساختار پایگاه داده کامل نیست. برای نسخه فعلی، دیتابیس آزمایشی را خالی ایجاد و فقط فایل Database/001_initial.sql را اجرا کنید.");
     }
 }
