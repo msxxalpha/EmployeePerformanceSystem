@@ -121,18 +121,33 @@ public class EvaluationController(AppDbContext db, PerformanceService ps, ExcelS
         var ev = await db.Evaluations.Include(x => x.Scores).Include(x => x.Period).SingleOrDefaultAsync(x => x.Id == evaluationId);
         if (ev == null) return NotFound();
         var employee = await db.Employees.AsNoTracking().Include(x => x.Position).SingleOrDefaultAsync(x => x.Id == ev.EmployeeId && x.IsActive);
-        if (employee == null || !await ps.CanEvaluate(actor, employee.Id) || !await ps.CanReviewEvaluation(actor, ev)) return Forbid();
+        // مشاهده جزئیات برای هر ارزیاب در زنجیره‌ای که کارمند در زیرمجموعه او قرار دارد مجاز است.
+        // تنها اختیار ویرایش/بازنگری بر اساس ارزیاب فعلی و جایگاه بالادستی او تعیین می‌شود.
+        if (employee == null || !await ps.CanEvaluate(actor, employee.Id)) return Forbid();
 
         var qs = await QuestionList(employee.PositionId);
         var history = await History(ev.Id);
-        var canEdit = ev.Period != null && ev.Period.IsOpen && ev.Period.StartAt <= DateTime.Now && ev.Period.EndAt >= DateTime.Now;
+        var canEdit = ev.Period != null
+                      && ev.Period.IsOpen
+                      && ev.Period.StartAt <= DateTime.Now
+                      && ev.Period.EndAt >= DateTime.Now
+                      && await ps.CanReviewEvaluation(actor, ev);
+
+        var notice = ev.Period == null
+            ? "دوره این ارزیابی در دسترس نیست؛ اطلاعات فقط قابل مشاهده است."
+            : !ev.Period.IsOpen || ev.Period.EndAt < DateTime.Now
+                ? "این دوره بسته است؛ اطلاعات فقط قابل مشاهده است."
+                : canEdit
+                    ? "این ارزیابی در دوره فعال قابل بازنگری است."
+                    : "این ارزیابی توسط ارزیاب دیگری ثبت شده است؛ شما فقط مجاز به مشاهده جزئیات هستید.";
+
         var viewQs = qs.Select(q => q with
         {
             Score = ev.Scores.FirstOrDefault(s => s.QuestionId == q.QuestionId)?.Score ?? 0,
             Comment = ev.Scores.FirstOrDefault(s => s.QuestionId == q.QuestionId)?.Comment
         }).ToList();
 
-        return View("Form", new FormVm(ev.Period!, employee, viewQs, ev, canEdit, canEdit ? "این ارزیابی در دوره فعال قابل بازنگری است." : "این دوره بسته است؛ اطلاعات فقط قابل مشاهده است.", history, ev.FinalScore, ev.FinalMaxScore));
+        return View("Form", new FormVm(ev.Period!, employee, viewQs, ev, canEdit, notice, history, ev.FinalScore, ev.FinalMaxScore));
     }
 
     [HttpPost, ValidateAntiForgeryToken]
@@ -243,11 +258,32 @@ public class EvaluationController(AppDbContext db, PerformanceService ps, ExcelS
             .Select(x => new EvalQuestionVm(x.QuestionId, x.Question!.Code, x.Question.Title, x.Question.EvaluationDomain!.Title, x.Question.Description, x.MaxScore, x.SortOrder, 0, null))
             .ToListAsync();
 
-    private async Task<List<HistoryRow>> History(int id) =>
-        await db.ScoreHistory.AsNoTracking()
+    private async Task<List<HistoryRow>> History(int id)
+    {
+        // برای جلوگیری از خطای ترجمه Join روی ScoreHistory/Questions،
+        // رکوردهای تاریخچه و عنوان سؤال جداگانه دریافت و سپس در حافظه ترکیب می‌شوند.
+        var histories = await db.ScoreHistory.AsNoTracking()
             .Where(x => x.EvaluationId == id)
-            .Join(db.Questions, h => h.QuestionId, q => q.Id, (h, q) => new HistoryRow(q.Title, h.OldScore, h.NewScore, h.ChangedBy, h.ChangedAt, h.Reason))
-            .OrderByDescending(x => x.ChangedAt).ToListAsync();
+            .OrderByDescending(x => x.ChangedAt)
+            .ToListAsync();
+
+        if (histories.Count == 0)
+            return [];
+
+        var questionIds = histories.Select(x => x.QuestionId).Distinct().ToList();
+        var questionTitles = await db.Questions.AsNoTracking()
+            .Where(x => questionIds.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, x => x.Title);
+
+        return histories.Select(h => new HistoryRow(
+                questionTitles.GetValueOrDefault(h.QuestionId, $"سؤال {h.QuestionId}"),
+                h.OldScore,
+                h.NewScore,
+                h.ChangedBy,
+                h.ChangedAt,
+                h.Reason))
+            .ToList();
+    }
 
     private static decimal Percent(decimal score, decimal max) => max <= 0 ? 0 : Math.Round(score * 100 / max, 1);
 
