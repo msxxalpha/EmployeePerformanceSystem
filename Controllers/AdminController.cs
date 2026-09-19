@@ -342,6 +342,22 @@ public class AdminController(AppDbContext db, ExcelService excel, PerformanceSer
         return RedirectToAction(nameof(Employees));
     }
 
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> ActivateEmployee(int id)
+    {
+        var e = await db.Employees.FindAsync(id);
+        if (e == null) return NotFound();
+        e.IsActive = true;
+        var user = await db.Users.SingleOrDefaultAsync(x => x.EmployeeId == id);
+        if (user == null)
+            db.Users.Add(new AppUser { UserName = e.PersonnelNo, DisplayName = e.FullName, EmployeeId = e.Id, IsAdmin = false, IsActive = true, PasswordHash = PasswordHasher.Hash(e.NationalNo) });
+        else
+            user.IsActive = true;
+        await db.SaveChangesAsync();
+        TempData["Result"] = "کارمند و حساب ورود او فعال شدند.";
+        return RedirectToAction(nameof(Employees));
+    }
+
     [HttpGet]
     public IActionResult ImportEmployees() => View();
 
@@ -433,7 +449,18 @@ public class AdminController(AppDbContext db, ExcelService excel, PerformanceSer
     public record ScoreAdminRow(string Code, string Title, string Domain, decimal Score, decimal MaxScore, string? Comment);
     public record HistoryAdminRow(string QuestionTitle, decimal OldScore, decimal NewScore, int ChangedBy, DateTime ChangedAt, string Reason);
 
-    public record PeriodEditVm(int Id, string Title, string StartJalali, string EndJalali, string? Description, bool IsOpen);
+    public class PeriodEditVm
+    {
+        public int Id { get; set; }
+        public string Title { get; set; } = "";
+        public string StartJalali { get; set; } = "";
+        public string EndJalali { get; set; } = "";
+        public string? Description { get; set; }
+        public bool IsOpen { get; set; }
+        public PeriodEditVm() { }
+        public PeriodEditVm(int id,string title,string startJalali,string endJalali,string? description,bool isOpen)
+        { Id=id; Title=title; StartJalali=startJalali; EndJalali=endJalali; Description=description; IsOpen=isOpen; }
+    }
     public record PeriodDetailsVm(EvaluationPeriod Period, List<PeriodEvaluationRow> Evaluations);
     public record PeriodEvaluationRow(int EvaluationId, int EmployeeId, string Employee, string PersonnelNo, string Position, string Unit, string Evaluator, decimal Score, decimal Max, string Status);
 }
