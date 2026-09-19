@@ -54,6 +54,8 @@ public class SetupController(AppDbContext db, ExcelService excel) : Controller
             TempData["Error"] = "کد و عنوان حوزه ارزیابی الزامی است.";
         else if (await db.EvaluationDomains.AnyAsync(x => x.Id != id && x.Code == code))
             TempData["Error"] = "کد حوزه ارزیابی تکراری است.";
+        else if (!isActive && await db.Questions.AnyAsync(x => x.DomainId == id && x.IsActive))
+            TempData["Error"] = "حوزه دارای سؤال فعال است و نمی‌توان آن را غیرفعال کرد.";
         else
         {
             d.Code = code; d.Title = title; d.Description = description?.Trim();
