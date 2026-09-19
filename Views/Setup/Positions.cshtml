@@ -15,6 +15,6 @@
 <div class="row g-3">
 @foreach(var p in Model){<div class="col-xl-6"><div class="table-panel h-100">
   <div class="card-heading"><div><span class="eyebrow">@p.Code</span><h4>@p.Title</h4></div><div class="score-total"><span>سقف کل</span><b>@p.QuestionMappings.Where(x=>x.IsActive).Sum(x=>x.MaxScore).ToString("0.##")</b></div></div>
-  @if(!p.QuestionMappings.Any(x=>x.IsActive)){<div class="empty-inline">هیچ سؤال فعالی متصل نیست.</div>}else{<div class="table-responsive"><table class="table modern-table"><thead><tr><th>سؤال</th><th>حوزه</th><th>سقف</th><th>ترتیب</th></tr></thead><tbody>@foreach(var m in p.QuestionMappings.Where(x=>x.IsActive).OrderBy(x=>x.SortOrder)){<tr><td>@m.Question?.Title</td><td><span class="domain-chip">@m.Question?.Domain</span></td><td>@m.MaxScore.ToString("0.##")</td><td>@m.SortOrder</td></tr>}</tbody></table></div>}
+  @if(!p.QuestionMappings.Any(x=>x.IsActive)){<div class="empty-inline">هیچ سؤال فعالی متصل نیست.</div>}else{<div class="table-responsive"><table class="table modern-table"><thead><tr><th>سؤال</th><th>حوزه</th><th>سقف</th><th>ترتیب</th></tr></thead><tbody>@foreach(var m in p.QuestionMappings.Where(x=>x.IsActive).OrderBy(x=>x.SortOrder)){<tr><td>@m.Question?.Title</td><td><span class="domain-chip">@m.Question?.EvaluationDomain?.Title</span></td><td>@m.MaxScore.ToString("0.##")</td><td>@m.SortOrder</td></tr>}</tbody></table></div>}
 </div></div>}
 </div>
