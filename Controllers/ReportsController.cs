@@ -53,7 +53,7 @@ public class ReportsController(AppDbContext db, ExcelService excel) : Controller
             join q in db.Questions.AsNoTracking() on s.QuestionId equals q.Id
             join d in db.EvaluationDomains.AsNoTracking() on q.DomainId equals d.Id
             where ev.PeriodId == periodId
-            select new { s.QuestionId, q.Title, d.Title as Domain, s.Score, s.MaxScore })
+            select new { s.QuestionId, q.Title, Domain = d.Title, s.Score, s.MaxScore })
             .ToListAsync();
 
         var questionAverages = questionScores
