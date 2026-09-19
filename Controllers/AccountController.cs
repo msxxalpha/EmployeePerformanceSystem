@@ -20,5 +20,39 @@ public class AccountController(AppDbContext db):Controller{
  if(u.IsAdmin)return Redirect("/");
  if(u.EmployeeId.HasValue){var emp=await db.Employees.AsNoTracking().SingleAsync(x=>x.Id==u.EmployeeId.Value);return Redirect(emp.IsEvaluator?"/Evaluation":"/EmployeeDashboard");}
  return Redirect("/");}
+[HttpGet][Authorize]public IActionResult ChangePassword()=>View(new ChangePasswordVm());
+
+[HttpPost][Authorize][ValidateAntiForgeryToken]
+public async Task<IActionResult> ChangePassword(ChangePasswordVm m){
+ var userIdText=User.FindFirstValue(ClaimTypes.NameIdentifier);
+ if(!int.TryParse(userIdText,out var userId))return Challenge();
+ if(string.IsNullOrWhiteSpace(m.CurrentPassword)||string.IsNullOrWhiteSpace(m.NewPassword)||string.IsNullOrWhiteSpace(m.ConfirmPassword)){
+  ModelState.AddModelError("","تکمیل همه فیلدهای رمز عبور الزامی است.");
+  return View(m);
+ }
+ if(m.NewPassword.Length<8){
+  ModelState.AddModelError(nameof(m.NewPassword),"رمز عبور جدید باید حداقل ۸ کاراکتر باشد.");
+  return View(m);
+ }
+ if(m.NewPassword!=m.ConfirmPassword){
+  ModelState.AddModelError(nameof(m.ConfirmPassword),"تکرار رمز عبور جدید با آن یکسان نیست.");
+  return View(m);
+ }
+ var u=await db.Users.SingleOrDefaultAsync(x=>x.Id==userId&&x.IsActive);
+ if(u==null)return Challenge();
+ if(!PasswordHasher.Verify(m.CurrentPassword,u.PasswordHash)){
+  ModelState.AddModelError(nameof(m.CurrentPassword),"رمز عبور فعلی صحیح نیست.");
+  return View(m);
+ }
+ if(PasswordHasher.Verify(m.NewPassword,u.PasswordHash)){
+  ModelState.AddModelError(nameof(m.NewPassword),"رمز عبور جدید باید با رمز عبور فعلی متفاوت باشد.");
+  return View(m);
+ }
+ u.PasswordHash=PasswordHasher.Hash(m.NewPassword);
+ await db.SaveChangesAsync();
+ TempData["Result"]="رمز عبور شما با موفقیت تغییر کرد.";
+ return RedirectToAction("Index","Home");
+}
+
 [HttpPost][Authorize][ValidateAntiForgeryToken]public async Task<IActionResult> Logout(){await HttpContext.SignOutAsync();return RedirectToAction(nameof(Login));}
-[AllowAnonymous]public IActionResult Denied()=>Content("دسترسی غیرمجاز است.");public record LoginVm{public string UserName{get;set;}="";public string Password{get;set;}="";public string? returnUrl{get;set;}}}
+[AllowAnonymous]public IActionResult Denied()=>Content("دسترسی غیرمجاز است.");public record LoginVm{public string UserName{get;set;}="";public string Password{get;set;}="";public string? returnUrl{get;set;}}public class ChangePasswordVm{public string CurrentPassword{get;set;}="";public string NewPassword{get;set;}="";public string ConfirmPassword{get;set;}="";}}
