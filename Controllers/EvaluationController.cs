@@ -21,10 +21,23 @@ public class EvaluationController(AppDbContext db, PerformanceService ps, ExcelS
 
         var periods = await db.Periods.AsNoTracking().OrderByDescending(x => x.StartAt).ToListAsync();
         var active = periods.FirstOrDefault(x => x.IsOpen && x.StartAt <= DateTime.Now && x.EndAt >= DateTime.Now);
-        var selected = periodId.HasValue ? periods.FirstOrDefault(x => x.Id == periodId.Value) : active;
 
         var employees = await ps.GetSubordinates(evaluatorId);
         var employeeIds = employees.Select(x => x.Id).ToList();
+
+        var relevantPeriodIds = employeeIds.Count == 0
+            ? new HashSet<int>()
+            : (await db.Evaluations.AsNoTracking()
+                .Where(x => employeeIds.Contains(x.EmployeeId) && (x.EvaluatorId == evaluatorId || x.OriginalEvaluatorId == evaluatorId))
+                .Select(x => x.PeriodId).Distinct().ToListAsync()).ToHashSet();
+
+        var selectablePeriods = periods.Where(p =>
+            (active != null && p.Id == active.Id) ||
+            (p.StartAt <= DateTime.Now && p.EndAt < DateTime.Now && relevantPeriodIds.Contains(p.Id))).ToList();
+
+        var selected = periodId.HasValue
+            ? selectablePeriods.FirstOrDefault(x => x.Id == periodId.Value)
+            : active ?? selectablePeriods.FirstOrDefault();
 
         List<Evaluation> evaluations = [];
         if (selected != null && employeeIds.Count > 0)
@@ -55,7 +68,7 @@ public class EvaluationController(AppDbContext db, PerformanceService ps, ExcelS
         var questionIds = evaluations.SelectMany(x => x.Scores).Select(x => x.QuestionId).Distinct().ToList();
         var questionMap = questionIds.Count == 0 ? new Dictionary<int, Question>() : await db.Questions.AsNoTracking().Where(x => questionIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id);
         var analytics = BuildAnalytics(evaluations, employees, questionMap);
-        var periodOptions = periods.Select(p => new PeriodOptionVm(p.Id, p.Title, p.StartAt <= DateTime.Now && p.EndAt >= DateTime.Now && p.IsOpen, p.EndAt < DateTime.Now, evaluations.Any(e => e.PeriodId == p.Id))).ToList();
+        var periodOptions = selectablePeriods.Select(p => new PeriodOptionVm(p.Id, p.Title, p.StartAt <= DateTime.Now && p.EndAt >= DateTime.Now && p.IsOpen, p.EndAt < DateTime.Now, relevantPeriodIds.Contains(p.Id))).ToList();
 
         var message = active == null
             ? "در حال حاضر دوره فعالی برای ثبت ارزیابی وجود ندارد. دوره‌های قبلی را انتخاب کنید تا سوابق و تحلیل عملکرد را مشاهده کنید."
