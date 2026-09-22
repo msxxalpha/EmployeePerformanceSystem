@@ -145,7 +145,7 @@ public class HierarchyAndEvaluationTests
         db.PositionQuestions.AddRange(
             new PositionQuestion { Id = 1, PositionId = 1, QuestionId = 1, MaxScore = 10, SortOrder = 1, IsActive = true },
             new PositionQuestion { Id = 2, PositionId = 1, QuestionId = 2, MaxScore = 25, SortOrder = 2, IsActive = true });
-        AddHierarchy(db);
+        AddHierarchy(db, false);
         await db.SaveChangesAsync();
 
         var controller = CreateEvaluatorController(db, service, 1);
@@ -169,7 +169,7 @@ public class HierarchyAndEvaluationTests
         db.PositionQuestions.AddRange(
             new PositionQuestion { Id = 1, PositionId = 1, QuestionId = 1, MaxScore = 10, SortOrder = 1, IsActive = true },
             new PositionQuestion { Id = 2, PositionId = 1, QuestionId = 2, MaxScore = 25, SortOrder = 2, IsActive = true });
-        AddHierarchy(db);
+        AddHierarchy(db, false);
         await db.SaveChangesAsync();
 
         var controller = CreateEvaluatorController(db, service, 1);
@@ -193,7 +193,7 @@ public class HierarchyAndEvaluationTests
         var (db, service) = CreateDb(); AddMasterData(db);
         var now = DateTime.Now;
         db.Periods.Add(new EvaluationPeriod { Id = 1, Title = "فعال", StartAt = now.AddHours(-1), EndAt = now.AddHours(1), IsOpen = true });
-        AddHierarchy(db);
+        AddHierarchy(db, false);
         db.Evaluations.AddRange(
             new Evaluation { Id = 301, PeriodId = 1, EmployeeId = 2, EvaluatorId = 1, OriginalEvaluatorId = 1, FinalScore = 900, FinalMaxScore = 1000, Status = EvaluationStatus.Submitted },
             new Evaluation { Id = 302, PeriodId = 1, EmployeeId = 3, EvaluatorId = 1, OriginalEvaluatorId = 1, FinalScore = 900, FinalMaxScore = 1000, Status = EvaluationStatus.Submitted });
@@ -217,7 +217,7 @@ public class HierarchyAndEvaluationTests
         db.Periods.Add(new EvaluationPeriod { Id = 1, Title = "فعال", StartAt = now.AddHours(-1), EndAt = now.AddHours(1), IsOpen = true });
         db.Questions.Add(new Question { Id = 1, Code = "Q1", Title = "Q1", DomainId = 1, Text = "Q1", IsActive = true });
         db.PositionQuestions.Add(new PositionQuestion { Id = 1, PositionId = 1, QuestionId = 1, MaxScore = 100, SortOrder = 1, IsActive = true });
-        AddHierarchy(db);
+        AddHierarchy(db, false);
         db.Evaluations.Add(new Evaluation
         {
             Id = 100, PeriodId = 1, EmployeeId = 2, EvaluatorId = 2, OriginalEvaluatorId = 2,
