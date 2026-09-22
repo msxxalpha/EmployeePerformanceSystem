@@ -74,9 +74,129 @@ public class EvaluationController(AppDbContext db, PerformanceService ps, ExcelS
             ? "در حال حاضر دوره فعالی برای ثبت ارزیابی وجود ندارد. دوره‌های قبلی را انتخاب کنید تا سوابق و تحلیل عملکرد را مشاهده کنید."
             : null;
 
+        var totalMaxScore = evaluations.Sum(x => x.FinalMaxScore);
+        var totalUsedScore = evaluations.Sum(x => x.FinalScore);
+        var totalDeductedScore = Math.Max(0m, totalMaxScore - totalUsedScore);
+
         return View(new DashboardVm(
             selected, active, periods, periodOptions, rows, analytics.TopPerformers, analytics.Improvements,
-            analytics.QuestionAverages, message));
+            analytics.QuestionAverages, totalMaxScore, totalUsedScore, totalDeductedScore, message));
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> QuickEvaluateAll()
+    {
+        if (!TryEvaluator(out var evaluatorId) || !await ps.IsEvaluator(evaluatorId)) return Forbid();
+
+        await ps.SyncExpiredPeriodsAsync();
+        var period = await ps.CurrentPeriod();
+        if (period == null)
+        {
+            TempData["Error"] = "در حال حاضر دوره فعال و باز برای ارزیابی وجود ندارد.";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var employees = await ps.GetSubordinates(evaluatorId);
+        if (employees.Count == 0)
+        {
+            TempData["Error"] = "برای این ارزیاب هیچ زیرمجموعه فعال قابل ارزیابی ثبت نشده است.";
+            return RedirectToAction(nameof(Index), new { periodId = period.Id });
+        }
+
+        var employeeIds = employees.Select(x => x.Id).ToList();
+        var existingIds = (await db.Evaluations.AsNoTracking()
+                .Where(x => x.PeriodId == period.Id && employeeIds.Contains(x.EmployeeId))
+                .Select(x => x.EmployeeId)
+                .ToListAsync())
+            .ToHashSet();
+
+        var positionIds = employees.Select(x => x.PositionId).Distinct().ToList();
+        var mappings = await db.PositionQuestions.AsNoTracking()
+            .Where(x => positionIds.Contains(x.PositionId) &&
+                        x.IsActive &&
+                        x.Question != null &&
+                        x.Question.IsActive)
+            .Select(x => new
+            {
+                x.PositionId,
+                x.QuestionId,
+                x.MaxScore
+            })
+            .ToListAsync();
+
+        var mappingsByPosition = mappings
+            .GroupBy(x => x.PositionId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var created = 0;
+        var skippedWithoutQuestions = 0;
+        var alreadyEvaluated = 0;
+
+        foreach (var employee in employees)
+        {
+            if (existingIds.Contains(employee.Id))
+            {
+                alreadyEvaluated++;
+                continue;
+            }
+
+            if (!mappingsByPosition.TryGetValue(employee.PositionId, out var positionQuestions) || positionQuestions.Count == 0)
+            {
+                skippedWithoutQuestions++;
+                continue;
+            }
+
+            var ev = new Evaluation
+            {
+                PeriodId = period.Id,
+                EmployeeId = employee.Id,
+                EvaluatorId = evaluatorId,
+                OriginalEvaluatorId = evaluatorId,
+                Status = EvaluationStatus.Submitted,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            foreach (var q in positionQuestions)
+            {
+                ev.Scores.Add(new EvaluationScore
+                {
+                    QuestionId = q.QuestionId,
+                    Score = q.MaxScore,
+                    MaxScore = q.MaxScore,
+                    UpdatedAt = DateTime.UtcNow
+                });
+            }
+
+            ev.FinalScore = ev.Scores.Sum(x => x.Score);
+            ev.FinalMaxScore = ev.Scores.Sum(x => x.MaxScore);
+
+            db.Evaluations.Add(ev);
+            created++;
+        }
+
+        if (created > 0)
+        {
+            var userId = int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var uid) ? uid : (int?)null;
+            db.AuditLogs.Add(new AuditLog
+            {
+                Action = "QuickEvaluationsCreated",
+                Entity = "Evaluation",
+                EntityId = period.Id.ToString(),
+                Details = $"PeriodId={period.Id};EvaluatorId={evaluatorId};Created={created};AlreadyEvaluated={alreadyEvaluated};SkippedWithoutQuestions={skippedWithoutQuestions}",
+                UserId = userId
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var message = $"ارزیابی سریع انجام شد. {created} نفر با امتیاز کامل ارزیابی شدند.";
+        if (alreadyEvaluated > 0)
+            message += $" {alreadyEvaluated} نفر که قبلاً ارزیابی شده بودند بدون تغییر باقی ماندند.";
+        if (skippedWithoutQuestions > 0)
+            message += $" {skippedWithoutQuestions} نفر به دلیل نداشتن سؤال فعال برای رده پستی، ارزیابی نشدند.";
+
+        TempData["Result"] = message;
+        return RedirectToAction(nameof(Index), new { periodId = period.Id });
     }
 
     [HttpGet]
@@ -105,7 +225,7 @@ public class EvaluationController(AppDbContext db, PerformanceService ps, ExcelS
 
         var viewQs = qs.Select(q => q with
         {
-            Score = ev?.Scores.FirstOrDefault(s => s.QuestionId == q.QuestionId)?.Score ?? 0,
+            Score = ev?.Scores.FirstOrDefault(s => s.QuestionId == q.QuestionId)?.Score ?? q.MaxScore,
             Comment = ev?.Scores.FirstOrDefault(s => s.QuestionId == q.QuestionId)?.Comment
         }).ToList();
 
@@ -176,7 +296,9 @@ public class EvaluationController(AppDbContext db, PerformanceService ps, ExcelS
             ev = new Evaluation { PeriodId = period.Id, EmployeeId = employee.Id, EvaluatorId = actor, OriginalEvaluatorId = actor, Status = EvaluationStatus.Draft };
             foreach (var q in qs)
             {
-                var score = m.Scores.GetValueOrDefault(q.QuestionId);
+                var score = m.Scores.TryGetValue(q.QuestionId, out var postedScore)
+                    ? postedScore
+                    : q.MaxScore;
                 ValidateScore(q, score, m.Scores, ModelState);
                 ev.Scores.Add(new EvaluationScore { QuestionId = q.QuestionId, Score = score, MaxScore = q.MaxScore, Comment = m.Comments.GetValueOrDefault(q.QuestionId)?.Trim() });
             }
@@ -208,7 +330,11 @@ public class EvaluationController(AppDbContext db, PerformanceService ps, ExcelS
 
         if (!ModelState.IsValid)
         {
-            var posted = qs.Select(q => q with { Score = m.Scores.GetValueOrDefault(q.QuestionId), Comment = m.Comments.GetValueOrDefault(q.QuestionId) }).ToList();
+            var posted = qs.Select(q => q with
+            {
+                Score = m.Scores.TryGetValue(q.QuestionId, out var postedScore) ? postedScore : q.MaxScore,
+                Comment = m.Comments.GetValueOrDefault(q.QuestionId)
+            }).ToList();
             return View(new FormVm(period, employee, posted, ev, true, "برخی امتیازها نامعتبر هستند؛ سقف هر سؤال را رعایت کنید.", ev?.Id == 0 ? [] : await History(ev!.Id), ev?.Scores.Sum(x => x.Score) ?? 0, ev?.Scores.Sum(x => x.MaxScore) ?? 0));
         }
 
@@ -312,7 +438,19 @@ public class EvaluationController(AppDbContext db, PerformanceService ps, ExcelS
         return new Analytics(tops, lows, questionAverages);
     }
 
-    public record DashboardVm(EvaluationPeriod? SelectedPeriod, EvaluationPeriod? ActivePeriod, List<EvaluationPeriod> Periods, List<PeriodOptionVm> PeriodOptions, List<Row> Employees, List<PerformanceRow> TopPerformers, List<PerformanceRow> Improvements, List<QuestionAverageVm> QuestionAverages, string? Message);
+    public record DashboardVm(
+        EvaluationPeriod? SelectedPeriod,
+        EvaluationPeriod? ActivePeriod,
+        List<EvaluationPeriod> Periods,
+        List<PeriodOptionVm> PeriodOptions,
+        List<Row> Employees,
+        List<PerformanceRow> TopPerformers,
+        List<PerformanceRow> Improvements,
+        List<QuestionAverageVm> QuestionAverages,
+        decimal TotalMaxScore,
+        decimal TotalUsedScore,
+        decimal TotalDeductedScore,
+        string? Message);
     public record PeriodOptionVm(int Id, string Title, bool IsActive, bool IsClosed, bool HasEvaluations);
     public record Row(int Id,int? EvaluationId,string Name,string PersonnelNo,string Position,string Unit,bool IsEvaluator,string Status,decimal Total,decimal Max,decimal Percentage,string CurrentEvaluator,bool IsTakeover);
     public record PerformanceRow(int EmployeeId,string Name,decimal Percentage);
