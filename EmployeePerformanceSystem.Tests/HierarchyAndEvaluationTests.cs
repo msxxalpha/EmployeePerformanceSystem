@@ -188,6 +188,28 @@ public class HierarchyAndEvaluationTests
     }
 
     [Fact]
+    public async Task EvaluatorDashboardCalculatesTotalDeductedScore()
+    {
+        var (db, service) = CreateDb(); AddMasterData(db);
+        var now = DateTime.Now;
+        db.Periods.Add(new EvaluationPeriod { Id = 1, Title = "فعال", StartAt = now.AddHours(-1), EndAt = now.AddHours(1), IsOpen = true });
+        AddHierarchy(db);
+        db.Evaluations.AddRange(
+            new Evaluation { Id = 301, PeriodId = 1, EmployeeId = 2, EvaluatorId = 1, OriginalEvaluatorId = 1, FinalScore = 900, FinalMaxScore = 1000, Status = EvaluationStatus.Submitted },
+            new Evaluation { Id = 302, PeriodId = 1, EmployeeId = 3, EvaluatorId = 1, OriginalEvaluatorId = 1, FinalScore = 900, FinalMaxScore = 1000, Status = EvaluationStatus.Submitted });
+        await db.SaveChangesAsync();
+
+        var controller = CreateEvaluatorController(db, service, 1);
+        var result = await controller.Index(1);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<EvaluationController.DashboardVm>(view.Model);
+        Assert.Equal(2000m, model.TotalMaxScore);
+        Assert.Equal(1800m, model.TotalUsedScore);
+        Assert.Equal(200m, model.TotalDeductedScore);
+    }
+
+    [Fact]
     public async Task QuickEvaluationDoesNotOverwriteAnExistingDeduction()
     {
         var (db, service) = CreateDb(); AddMasterData(db);
