@@ -1,8 +1,14 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Collections.Generic;
+using System.Security.Claims;
+using Indamin.Performance.Controllers;
 using Indamin.Performance.Data;
 using Indamin.Performance.Services;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -129,6 +135,114 @@ public class HierarchyAndEvaluationTests
     }
 
     [Fact]
+    public async Task FormDefaultsEveryQuestionScoreToItsMaximum()
+    {
+        var (db, service) = CreateDb(); AddMasterData(db);
+        var now = DateTime.Now;
+        db.Periods.Add(new EvaluationPeriod { Id = 1, Title = "فعال", StartAt = now.AddHours(-1), EndAt = now.AddHours(1), IsOpen = true });
+        db.Questions.Add(new Question { Id = 1, Code = "Q1", Title = "Q1", DomainId = 1, Text = "Q1", IsActive = true });
+        db.Questions.Add(new Question { Id = 2, Code = "Q2", Title = "Q2", DomainId = 1, Text = "Q2", IsActive = true });
+        db.PositionQuestions.AddRange(
+            new PositionQuestion { Id = 1, PositionId = 1, QuestionId = 1, MaxScore = 10, SortOrder = 1, IsActive = true },
+            new PositionQuestion { Id = 2, PositionId = 1, QuestionId = 2, MaxScore = 25, SortOrder = 2, IsActive = true });
+        AddHierarchy(db);
+        await db.SaveChangesAsync();
+
+        var controller = CreateEvaluatorController(db, service, 1);
+        var result = await controller.Form(2, 1);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<EvaluationController.FormVm>(view.Model);
+        Assert.Equal(new[] { 10m, 25m }, model.Questions.OrderBy(x => x.SortOrder).Select(x => x.Score).ToArray());
+        Assert.Equal(35m, model.FinalMaxScore);
+        Assert.True(model.CanEdit);
+    }
+
+    [Fact]
+    public async Task QuickEvaluationCreatesFullScoresForAllUnassessedSubordinates()
+    {
+        var (db, service) = CreateDb(); AddMasterData(db);
+        var now = DateTime.Now;
+        db.Periods.Add(new EvaluationPeriod { Id = 1, Title = "فعال", StartAt = now.AddHours(-1), EndAt = now.AddHours(1), IsOpen = true });
+        db.Questions.Add(new Question { Id = 1, Code = "Q1", Title = "Q1", DomainId = 1, Text = "Q1", IsActive = true });
+        db.Questions.Add(new Question { Id = 2, Code = "Q2", Title = "Q2", DomainId = 1, Text = "Q2", IsActive = true });
+        db.PositionQuestions.AddRange(
+            new PositionQuestion { Id = 1, PositionId = 1, QuestionId = 1, MaxScore = 10, SortOrder = 1, IsActive = true },
+            new PositionQuestion { Id = 2, PositionId = 1, QuestionId = 2, MaxScore = 25, SortOrder = 2, IsActive = true });
+        AddHierarchy(db);
+        await db.SaveChangesAsync();
+
+        var controller = CreateEvaluatorController(db, service, 1);
+        await controller.QuickEvaluateAll();
+
+        var evaluations = await db.Evaluations.Include(x => x.Scores).Where(x => x.PeriodId == 1).OrderBy(x => x.EmployeeId).ToListAsync();
+        Assert.Equal(new[] { 2, 3, 4 }, evaluations.Select(x => x.EmployeeId).ToArray());
+        Assert.All(evaluations, ev =>
+        {
+            Assert.Equal(35m, ev.FinalScore);
+            Assert.Equal(35m, ev.FinalMaxScore);
+            Assert.Equal(EvaluationStatus.Submitted, ev.Status);
+            Assert.Equal(new[] { 10m, 25m }, ev.Scores.OrderBy(x => x.QuestionId).Select(x => x.Score).ToArray());
+            Assert.All(ev.Scores, score => Assert.Equal(score.MaxScore, score.Score));
+        });
+    }
+
+    [Fact]
+    public async Task QuickEvaluationDoesNotOverwriteAnExistingDeduction()
+    {
+        var (db, service) = CreateDb(); AddMasterData(db);
+        var now = DateTime.Now;
+        db.Periods.Add(new EvaluationPeriod { Id = 1, Title = "فعال", StartAt = now.AddHours(-1), EndAt = now.AddHours(1), IsOpen = true });
+        db.Questions.Add(new Question { Id = 1, Code = "Q1", Title = "Q1", DomainId = 1, Text = "Q1", IsActive = true });
+        db.PositionQuestions.Add(new PositionQuestion { Id = 1, PositionId = 1, QuestionId = 1, MaxScore = 100, SortOrder = 1, IsActive = true });
+        AddHierarchy(db);
+        db.Evaluations.Add(new Evaluation
+        {
+            Id = 100, PeriodId = 1, EmployeeId = 2, EvaluatorId = 2, OriginalEvaluatorId = 2,
+            FinalScore = 80, FinalMaxScore = 100, Status = EvaluationStatus.Submitted
+        });
+        db.Scores.Add(new EvaluationScore { Id = 100, EvaluationId = 100, QuestionId = 1, Score = 80, MaxScore = 100 });
+        await db.SaveChangesAsync();
+
+        var controller = CreateEvaluatorController(db, service, 1);
+        await controller.QuickEvaluateAll();
+
+        var existing = await db.Evaluations.Include(x => x.Scores).SingleAsync(x => x.Id == 100);
+        Assert.Equal(80m, existing.FinalScore);
+        Assert.Equal(100m, existing.FinalMaxScore);
+
+        var created = await db.Evaluations.Include(x => x.Scores).SingleAsync(x => x.EmployeeId == 3);
+        Assert.Equal(100m, created.FinalScore);
+        Assert.Equal(100m, created.FinalMaxScore);
+    }
+
+    [Fact]
+    public async Task LowerEvaluatorCanViewUpperEvaluatorEvaluationButCannotEditIt()
+    {
+        var (db, service) = CreateDb(); AddHierarchy(db);
+        var now = DateTime.Now;
+        db.Periods.Add(new EvaluationPeriod { Id = 1, Title = "فعال", StartAt = now.AddHours(-1), EndAt = now.AddHours(1), IsOpen = true });
+        db.Questions.Add(new Question { Id = 1, Code = "Q1", Title = "Q1", DomainId = 1, Text = "Q1", IsActive = true });
+        db.PositionQuestions.Add(new PositionQuestion { Id = 1, PositionId = 1, QuestionId = 1, MaxScore = 100, SortOrder = 1, IsActive = true });
+        db.Evaluations.Add(new Evaluation
+        {
+            Id = 200, PeriodId = 1, EmployeeId = 3, EvaluatorId = 1, OriginalEvaluatorId = 1,
+            FinalScore = 90, FinalMaxScore = 100, Status = EvaluationStatus.Submitted
+        });
+        db.Scores.Add(new EvaluationScore { Id = 200, EvaluationId = 200, QuestionId = 1, Score = 90, MaxScore = 100 });
+        await db.SaveChangesAsync();
+
+        var controller = CreateEvaluatorController(db, service, 2);
+        var result = await controller.Review(200);
+
+        var view = Assert.IsType<ViewResult>(result);
+        var model = Assert.IsType<EvaluationController.FormVm>(view.Model);
+        Assert.Equal("C", model.Employee.FullName);
+        Assert.Equal(90m, model.FinalScore);
+        Assert.False(model.CanEdit);
+    }
+
+    [Fact]
     public async Task FinalScoreIsTheSumOfQuestionScores()
     {
         var (db, service) = CreateDb(); AddMasterData(db);
@@ -150,6 +264,29 @@ public class HierarchyAndEvaluationTests
         Assert.True(await service.CanEdit(new EvaluationPeriod{IsOpen=true,StartAt=now.AddMinutes(-1),EndAt=now.AddMinutes(1)}));
         Assert.False(await service.CanEdit(new EvaluationPeriod{IsOpen=true,StartAt=now.AddMinutes(-2),EndAt=now.AddMinutes(-1)}));
         Assert.False(await service.CanEdit(new EvaluationPeriod{IsOpen=false,StartAt=now.AddMinutes(-1),EndAt=now.AddMinutes(1)}));
+    }
+
+    private static EvaluationController CreateEvaluatorController(AppDbContext db, PerformanceService service, int employeeId)
+    {
+        var http = new DefaultHttpContext();
+        http.User = new ClaimsPrincipal(new ClaimsIdentity(new[]
+        {
+            new Claim("EmployeeId", employeeId.ToString()),
+            new Claim(ClaimTypes.NameIdentifier, employeeId.ToString())
+        }, "TestAuth"));
+
+        var controller = new EvaluationController(db, service, new ExcelService())
+        {
+            ControllerContext = new ControllerContext { HttpContext = http },
+            TempData = new TempDataDictionary(http, new EmptyTempDataProvider())
+        };
+        return controller;
+    }
+
+    private sealed class EmptyTempDataProvider : ITempDataProvider
+    {
+        public IDictionary<string, object> LoadTempData(HttpContext context) => new Dictionary<string, object>();
+        public void SaveTempData(HttpContext context, IDictionary<string, object> values) { }
     }
 
     [Fact]
