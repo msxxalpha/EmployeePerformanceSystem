@@ -12,7 +12,7 @@ public class ReportsController(AppDbContext db, ExcelService excel) : Controller
     private const string ExcelMime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
     [HttpGet]
-    public async Task<IActionResult> Index(int? periodId)
+    public async Task<IActionResult> Index(int? periodId, string? q, int page = 1, int pageSize = 25)
     {
         var periods = await db.Periods.AsNoTracking().OrderByDescending(x => x.StartAt).ToListAsync();
         var selectable = periods.Where(x => !x.IsDeleted && x.StartAt <= DateTime.Now).ToList();
@@ -20,8 +20,24 @@ public class ReportsController(AppDbContext db, ExcelService excel) : Controller
             ? periodId.Value
             : selectable.FirstOrDefault()?.Id;
         var report = selectedId.HasValue ? await BuildReport(selectedId.Value) : EmptyReport();
-        var rows = selectedId.HasValue ? await QueryRows(selectedId.Value) : [];
-        return View(new ReportVm(periods, selectedId, report, rows));
+        var allRows = selectedId.HasValue ? await QueryRows(selectedId.Value) : [];
+        q = (q ?? "").Trim();
+        if (q != "")
+        {
+            allRows = allRows.Where(x =>
+                x.Employee.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                x.Evaluator.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                x.Unit.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                x.Position.Contains(q, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
+
+        pageSize = Paging.NormalizePageSize(pageSize);
+        var totalRows = allRows.Count;
+        var totalPages = Paging.TotalPages(totalRows, pageSize);
+        page = Paging.NormalizePage(page, totalPages);
+        var rows = allRows.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+
+        return View(new ReportVm(periods, selectedId, report, rows, totalRows, page, pageSize, q));
     }
 
     [HttpGet]
@@ -111,7 +127,7 @@ public class ReportsController(AppDbContext db, ExcelService excel) : Controller
     private static decimal Percent(decimal score, decimal max) => max <= 0 ? 0 : Math.Round(score * 100 / max, 1);
     private static ReportData EmptyReport() => new(null, 0, 0, 0, 0, [], [], [], [], [], new DistributionReport(0, 0, 0, 0));
 
-    public record ReportVm(List<EvaluationPeriod> Periods, int? SelectedPeriodId, ReportData Data, List<Row> Rows);
+    public record ReportVm(List<EvaluationPeriod> Periods, int? SelectedPeriodId, ReportData Data, List<Row> Rows, int TotalCount, int Page, int PageSize, string Search);
     public record ReportData(EvaluationPeriod? Period, int RowCount, int EvaluatedCount, decimal AveragePercentage, decimal CompletionPercentage, List<PersonReportRow> TopPerformers, List<PersonReportRow> ImprovementPeople, List<QuestionReportRow> QuestionAverages, List<DomainReportRow> DomainAverages, List<UnitReportRow> UnitAverages, DistributionReport Distribution);
     public record Row(string Employee, string Evaluator, string Unit, string Position, decimal Score, decimal Max, string Status);
     public record PersonReportRow(string Name, string Unit, decimal Percentage);
