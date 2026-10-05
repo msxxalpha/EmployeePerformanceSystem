@@ -10,7 +10,19 @@ namespace Indamin.Performance.Controllers;
 public class SetupController(AppDbContext db, ExcelService excel) : Controller
 {
     public async Task<IActionResult> Positions() =>
-        View(await db.Positions.Include(x => x.QuestionMappings).ThenInclude(x => x.Question!).ThenInclude(x => x.EvaluationDomain).OrderBy(x => x.Title).ToListAsync());
+        View(new PositionsVm(
+            await db.Positions
+                .Include(x => x.QuestionMappings)
+                .ThenInclude(x => x.Question!)
+                .ThenInclude(x => x.EvaluationDomain)
+                .OrderBy(x => x.Title)
+                .ToListAsync(),
+            await db.Questions
+                .Include(x => x.EvaluationDomain)
+                .Where(x => x.IsActive)
+                .OrderBy(x => x.Title)
+                .AsNoTracking()
+                .ToListAsync()));
 
     public async Task<IActionResult> Questions() =>
         View(new QuestionsVm(
