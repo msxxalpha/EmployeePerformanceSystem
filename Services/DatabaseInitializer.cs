@@ -6,7 +6,7 @@ namespace Indamin.Performance.Services;
 public static class DatabaseInitializer
 {
     private const string RequiredColumnSql = """
-        SELECT COUNT(*)
+        SELECT COUNT(*) AS [Value]
         FROM sys.columns
         WHERE object_id = OBJECT_ID('EvaluationPeriods')
           AND name IN ('IsDeleted','DeletedAt')
