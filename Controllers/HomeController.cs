@@ -12,7 +12,7 @@ public class HomeController(AppDbContext db):Controller
   return View(new HomeVm(User.Identity?.Name??"مدیر سیستم",
    await db.Employees.CountAsync(x=>x.IsActive),
    await db.Employees.CountAsync(x=>x.IsActive&&x.IsEvaluator),
-   await db.Periods.CountAsync(x=>x.IsOpen),
+   await db.Periods.CountAsync(x=>!x.IsDeleted && x.IsOpen),
    await db.Evaluations.CountAsync(x=>x.Status!=EvaluationStatus.Draft),
    await db.Positions.CountAsync(x=>x.IsActive),
    await db.OrgUnits.CountAsync(x=>x.IsActive),
