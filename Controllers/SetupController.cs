@@ -310,7 +310,7 @@ public class SetupController(AppDbContext db, ExcelService excel) : Controller
 
         return View(new OrgUnitsVm(
             rows,
-            await db.OrgUnits.Where(x => x.IsActive).OrderBy(x => x.Title).AsNoTracking().ToListAsync(),
+            await db.OrgUnits.OrderBy(x => x.Title).AsNoTracking().ToListAsync(),
             total, page, pageSize, q,
             AutoCodeGenerator.Next(await db.OrgUnits.AsNoTracking().Select(x => x.Code).ToListAsync(), "ORG")));
     }
