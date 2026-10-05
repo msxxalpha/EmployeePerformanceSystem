@@ -1,4 +1,4 @@
-@model List<Position>
+@model SetupController.PositionsVm
 @{ ViewData["Title"]="رده‌های پستی"; }
 <div class="page-header">
   <div><div class="eyebrow">اطلاعات پایه</div><h2>رده‌های پستی</h2><p class="text-muted">سقف کل هر رده از مجموع سقف سؤال‌های فعال متصل محاسبه می‌شود.</p></div>
@@ -13,12 +13,10 @@
   </form>
 </div>
 <div class="row g-3">
-@foreach(var p in Model){
+@foreach(var p in Model.Positions){
     var activeMappings = p.QuestionMappings.Where(x=>x.IsActive).OrderBy(x=>x.SortOrder).ToList();
     var mappedQuestionIds = activeMappings.Select(x=>x.QuestionId).ToHashSet();
-    var availableQuestions = p.QuestionMappings.Count == 0
-        ? ViewBag.AvailableQuestions as List<Question> ?? new List<Question>()
-        : ViewBag.AvailableQuestions as List<Question> ?? new List<Question>();
+    var availableQuestions = Model.Questions;
     <div class="col-xl-6"><div class="table-panel h-100">
         <div class="card-heading"><div><span class="eyebrow">@p.Code</span><h4>@p.Title</h4><small class="text-muted">مدیریت سؤال‌های اختصاصی این رده</small></div><div class="score-total"><span>سقف کل</span><b>@activeMappings.Sum(x=>x.MaxScore).ToString("0.##")</b></div></div>
 
