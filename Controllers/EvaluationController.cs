@@ -19,7 +19,7 @@ public class EvaluationController(AppDbContext db, PerformanceService ps, ExcelS
         if (!TryEvaluator(out var evaluatorId) || !await ps.IsEvaluator(evaluatorId)) return Forbid();
         await ps.SyncExpiredPeriodsAsync();
 
-        var periods = await db.Periods.AsNoTracking().OrderByDescending(x => x.StartAt).ToListAsync();
+        var periods = await db.Periods.AsNoTracking().Where(x => !x.IsDeleted).OrderByDescending(x => x.StartAt).ToListAsync();
         var active = periods.FirstOrDefault(x => x.IsOpen && x.StartAt <= DateTime.Now && x.EndAt >= DateTime.Now);
 
         var employees = await ps.GetSubordinates(evaluatorId);
@@ -206,7 +206,7 @@ public class EvaluationController(AppDbContext db, PerformanceService ps, ExcelS
         await ps.SyncExpiredPeriodsAsync();
 
         var period = periodId.HasValue
-            ? await db.Periods.AsNoTracking().SingleOrDefaultAsync(x => x.Id == periodId.Value)
+            ? await db.Periods.AsNoTracking().SingleOrDefaultAsync(x => x.Id == periodId.Value && !x.IsDeleted)
             : await ps.CurrentPeriod();
 
         if (period == null)
@@ -371,7 +371,7 @@ public class EvaluationController(AppDbContext db, PerformanceService ps, ExcelS
         if (!TryEvaluator(out var eid) || !await ps.IsEvaluator(eid)) return Forbid();
         var employees = await ps.GetSubordinates(eid);
         var ids = employees.Select(x => x.Id).ToList();
-        var period = periodId.HasValue ? await db.Periods.AsNoTracking().SingleOrDefaultAsync(x => x.Id == periodId.Value) : await ps.CurrentPeriod();
+        var period = periodId.HasValue ? await db.Periods.AsNoTracking().SingleOrDefaultAsync(x => x.Id == periodId.Value && !x.IsDeleted) : await ps.CurrentPeriod();
         var evs = period == null || ids.Count == 0 ? [] : await db.Evaluations.AsNoTracking().Where(x => x.PeriodId == period.Id && ids.Contains(x.EmployeeId)).Include(x => x.Period).ToListAsync();
         var rows = employees.Select(e => { var ev = evs.FirstOrDefault(x => x.EmployeeId == e.Id); return (e.FullName, "—", e.Unit?.Title ?? "—", e.Position?.Title ?? "—", ev?.FinalScore ?? 0, ev?.FinalMaxScore ?? 0, ev?.Status.ToString() ?? "ثبت نشده"); });
         return File(excel.Evaluations(rows), ExcelMime, "MyEvaluationDashboard.xlsx");
