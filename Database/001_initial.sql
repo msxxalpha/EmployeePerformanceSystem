@@ -59,7 +59,7 @@ CREATE TABLE Questions(
     CONSTRAINT UQ_Questions_Code UNIQUE(Code)
 );
 
-ALTER TABLE Questions ADD CONSTRAINT FK_Questions_EvaluationDomain FOREIGN KEY(DomainId) REFERENCES EvaluationDomains(Id) ON DELETE RESTRICT;
+ALTER TABLE Questions ADD CONSTRAINT FK_Questions_EvaluationDomain FOREIGN KEY(DomainId) REFERENCES EvaluationDomains(Id) ON DELETE NO ACTION;
 
 CREATE TABLE PositionQuestions(
     Id INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_PositionQuestions PRIMARY KEY,
