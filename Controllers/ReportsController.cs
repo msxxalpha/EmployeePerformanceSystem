@@ -79,16 +79,22 @@ public class ReportsController(AppDbContext db, ExcelService excel) : Controller
         return new ReportData(period, rows.Count, evaluated.Count, avg, completion, tops, lows, questionAverages, domainAverages, unitAverages, distribution);
     }
 
-    private Task<List<Row>> QueryRows(int periodId) =>
-        (
+    private async Task<List<Row>> QueryRows(int periodId)
+    {
+        // ابتدا داده را از SQL Server می‌خوانیم و سپس مرتب‌سازی را در حافظه انجام می‌دهیم.
+        // OrderBy روی رکورد projection شده همراه با Status.ToString() در EF Core قابل ترجمه نبود.
+        var rows = await (
             from ev in db.Evaluations.AsNoTracking()
             join employee in db.Employees.AsNoTracking() on ev.EmployeeId equals employee.Id
             join evaluator in db.Employees.AsNoTracking() on ev.EvaluatorId equals evaluator.Id
             join unit in db.OrgUnits.AsNoTracking() on employee.UnitId equals unit.Id
             join position in db.Positions.AsNoTracking() on employee.PositionId equals position.Id
             where ev.PeriodId == periodId
-            select new Row(employee.FullName, evaluator.FullName, unit.Title, position.Title, ev.FinalScore, ev.FinalMaxScore, ev.Status.ToString())
-        ).OrderBy(x => x.Employee).ToListAsync();
+            select new Row(employee.FullName, evaluator.FullName, unit.Title, position.Title, ev.FinalScore, ev.FinalMaxScore, ev.Status)
+        ).ToListAsync();
+
+        return rows.OrderBy(x => x.Employee).ToList();
+    }
 
     private static decimal Percent(decimal score, decimal max) => max <= 0 ? 0 : Math.Round(score * 100 / max, 1);
     private static ReportData EmptyReport() => new(null, 0, 0, 0, 0, [], [], [], [], [], new DistributionReport(0, 0, 0, 0));
