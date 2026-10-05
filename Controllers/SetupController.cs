@@ -22,24 +22,67 @@ public class SetupController(AppDbContext db, ExcelService excel) : Controller
                 .Where(x => x.IsActive)
                 .OrderBy(x => x.Title)
                 .AsNoTracking()
-                .ToListAsync()));
+                .ToListAsync(),
+            AutoCodeGenerator.Next(await db.Positions.AsNoTracking().Select(x => x.Code).ToListAsync(), "POS")));
 
-    public async Task<IActionResult> Questions() =>
-        View(new QuestionsVm(
-            await db.Questions.Include(x => x.EvaluationDomain).Include(x => x.PositionMappings).ThenInclude(x => x.Position).OrderBy(x => x.EvaluationDomain!.SortOrder).ThenBy(x => x.Title).ToListAsync(),
+    public async Task<IActionResult> Questions(string? q, int page = 1, int pageSize = 25) 
+    {
+        pageSize = Paging.NormalizePageSize(pageSize);
+        q = (q ?? "").Trim();
+
+        var query = db.Questions
+            .Include(x => x.EvaluationDomain)
+            .Include(x => x.PositionMappings).ThenInclude(x => x.Position)
+            .AsQueryable();
+
+        if (q != "")
+            query = query.Where(x => x.Code.Contains(q) || x.Title.Contains(q) || x.Text.Contains(q) || x.EvaluationDomain!.Title.Contains(q));
+
+        var total = await query.CountAsync();
+        var totalPages = Paging.TotalPages(total, pageSize);
+        page = Paging.NormalizePage(page, totalPages);
+
+        var rows = await query
+            .OrderBy(x => x.EvaluationDomain!.SortOrder).ThenBy(x => x.Title)
+            .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+
+        return View(new QuestionsVm(
+            rows,
             await db.Positions.Where(x => x.IsActive).OrderBy(x => x.Title).ToListAsync(),
-            await db.EvaluationDomains.Where(x => x.IsActive).OrderBy(x => x.SortOrder).ThenBy(x => x.Title).ToListAsync()));
+            await db.EvaluationDomains.Where(x => x.IsActive).OrderBy(x => x.SortOrder).ThenBy(x => x.Title).ToListAsync(),
+            total, page, pageSize, q,
+            AutoCodeGenerator.Next(await db.Questions.AsNoTracking().Select(x => x.Code).ToListAsync(), "Q")));
+    }
 
     [HttpGet]
-    public async Task<IActionResult> Domains() =>
-        View(await db.EvaluationDomains.OrderBy(x => x.SortOrder).ThenBy(x => x.Title).ToListAsync());
+    public async Task<IActionResult> Domains(string? q, int page = 1, int pageSize = 25)
+    {
+        pageSize = Paging.NormalizePageSize(pageSize);
+        q = (q ?? "").Trim();
+        var query = db.EvaluationDomains.AsQueryable();
+
+        if (q != "")
+            query = query.Where(x => x.Code.Contains(q) || x.Title.Contains(q) || (x.Description ?? "").Contains(q));
+
+        var total = await query.CountAsync();
+        var totalPages = Paging.TotalPages(total, pageSize);
+        page = Paging.NormalizePage(page, totalPages);
+        var rows = await query.OrderBy(x => x.SortOrder).ThenBy(x => x.Title)
+            .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+
+        return View(new DomainsVm(
+            rows, total, page, pageSize, q,
+            AutoCodeGenerator.Next(await db.EvaluationDomains.AsNoTracking().Select(x => x.Code).ToListAsync(), "DOM")));
+    }
 
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> AddDomain(string code, string title, string? description, int sortOrder = 1)
     {
         code = code?.Trim() ?? "";
         title = title?.Trim() ?? "";
-        if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(title))
+        if (string.IsNullOrWhiteSpace(code))
+            code = AutoCodeGenerator.Next(await db.EvaluationDomains.AsNoTracking().Select(x => x.Code).ToListAsync(), "DOM");
+        if (string.IsNullOrWhiteSpace(title))
             TempData["Error"] = "کد و عنوان حوزه ارزیابی الزامی است.";
         else if (await db.EvaluationDomains.AnyAsync(x => x.Code == code))
             TempData["Error"] = "کد حوزه ارزیابی تکراری است.";
@@ -101,9 +144,11 @@ public class SetupController(AppDbContext db, ExcelService excel) : Controller
     {
         code = code?.Trim() ?? "";
         title = title?.Trim() ?? "";
+        if (string.IsNullOrWhiteSpace(code))
+            code = AutoCodeGenerator.Next(await db.Positions.AsNoTracking().Select(x => x.Code).ToListAsync(), "POS");
 
-        if (code == "" || title == "")
-            TempData["Error"] = "کد و عنوان رده پستی الزامی است.";
+        if (title == "")
+            TempData["Error"] = "عنوان رده پستی الزامی است.";
         else if (await db.Positions.AnyAsync(x => x.Code == code))
             TempData["Error"] = "کد رده پستی تکراری است.";
         else
@@ -122,8 +167,10 @@ public class SetupController(AppDbContext db, ExcelService excel) : Controller
         code = code?.Trim() ?? "";
         title = title?.Trim() ?? "";
         text = string.IsNullOrWhiteSpace(text) ? title : text.Trim();
+        if (string.IsNullOrWhiteSpace(code))
+            code = AutoCodeGenerator.Next(await db.Questions.AsNoTracking().Select(x => x.Code).ToListAsync(), "Q");
 
-        if (code == "" || title == "" || domainId <= 0)
+        if (title == "" || domainId <= 0)
             TempData["Error"] = "کد، عنوان و حوزه ارزیابی سؤال الزامی است.";
         else if (!await db.EvaluationDomains.AnyAsync(x => x.Id == domainId && x.IsActive))
             TempData["Error"] = "حوزه ارزیابی انتخاب‌شده معتبر یا فعال نیست.";
@@ -256,9 +303,11 @@ public class SetupController(AppDbContext db, ExcelService excel) : Controller
     {
         code = code?.Trim() ?? "";
         title = title?.Trim() ?? "";
+        if (string.IsNullOrWhiteSpace(code))
+            code = AutoCodeGenerator.Next(await db.OrgUnits.AsNoTracking().Select(x => x.Code).ToListAsync(), "ORG");
 
-        if (code == "" || title == "")
-            TempData["Error"] = "کد و عنوان واحد سازمانی الزامی است.";
+        if (title == "")
+            TempData["Error"] = "عنوان واحد سازمانی الزامی است.";
         else if (await db.OrgUnits.AnyAsync(x => x.Code == code))
             TempData["Error"] = "کد واحد سازمانی تکراری است.";
         else if (parentId.HasValue && parentId.Value == 0)
