@@ -328,7 +328,16 @@ public class SetupController(AppDbContext db, ExcelService excel) : Controller
     [HttpGet] public async Task<IActionResult> ExportQuestions(){var rows=await db.Questions.Include(x=>x.PositionMappings).AsNoTracking().OrderBy(x=>x.EvaluationDomain!.SortOrder).ThenBy(x=>x.Title).ToListAsync();return File(excel.Questions(rows),"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","Questions.xlsx");}
     [HttpGet] public async Task<IActionResult> ExportOrgUnits(){var rows=await db.OrgUnits.AsNoTracking().OrderBy(x=>x.Title).ToListAsync();return File(excel.OrgUnits(rows),"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","OrgUnits.xlsx");}
 
-    public record QuestionsVm(List<Question> Questions, List<Position> Positions, List<EvaluationDomain> Domains);
-    public record PositionsVm(List<Position> Positions, List<Question> Questions);
-    public record OrgUnitsVm(List<OrgUnit> Units, List<OrgUnit> ParentOptions);
+    public record QuestionsVm(
+        List<Question> Questions,
+        List<Position> Positions,
+        List<EvaluationDomain> Domains,
+        int TotalCount,
+        int Page,
+        int PageSize,
+        string Search,
+        string NextCode);
+    public record DomainsVm(List<EvaluationDomain> Rows, int TotalCount, int Page, int PageSize, string Search, string NextCode);
+    public record PositionsVm(List<Position> Positions, List<Question> Questions, string NextCode);
+    public record OrgUnitsVm(List<OrgUnit> Units, List<OrgUnit> ParentOptions, int TotalCount, int Page, int PageSize, string Search, string NextCode);
 }
