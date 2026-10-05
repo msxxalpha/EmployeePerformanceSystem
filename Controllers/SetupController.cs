@@ -293,10 +293,27 @@ public class SetupController(AppDbContext db, ExcelService excel) : Controller
         await db.SaveChangesAsync();
     }
 
-    public async Task<IActionResult> OrgUnits() =>
-        View(new OrgUnitsVm(
-            await db.OrgUnits.OrderBy(x => x.Title).ToListAsync(),
-            await db.OrgUnits.Where(x => x.IsActive).OrderBy(x => x.Title).ToListAsync()));
+    public async Task<IActionResult> OrgUnits(string? q, int page = 1, int pageSize = 25)
+    {
+        pageSize = Paging.NormalizePageSize(pageSize);
+        q = (q ?? "").Trim();
+        var query = db.OrgUnits.AsQueryable();
+        if (q != "")
+            query = query.Where(x => x.Code.Contains(q) || x.Title.Contains(q));
+
+        var total = await query.CountAsync();
+        var totalPages = Paging.TotalPages(total, pageSize);
+        page = Paging.NormalizePage(page, totalPages);
+
+        var rows = await query.OrderBy(x => x.Title)
+            .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+
+        return View(new OrgUnitsVm(
+            rows,
+            await db.OrgUnits.Where(x => x.IsActive).OrderBy(x => x.Title).AsNoTracking().ToListAsync(),
+            total, page, pageSize, q,
+            AutoCodeGenerator.Next(await db.OrgUnits.AsNoTracking().Select(x => x.Code).ToListAsync(), "ORG")));
+    }
 
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> AddOrgUnit(string code, string title, int? parentId)
@@ -322,6 +339,115 @@ public class SetupController(AppDbContext db, ExcelService excel) : Controller
         }
 
         return RedirectToAction(nameof(OrgUnits));
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> ImportOrgUnits(IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+        {
+            TempData["Error"] = "فایل Excel انتخاب نشده است.";
+            return RedirectToAction(nameof(OrgUnits));
+        }
+
+        try
+        {
+            var rows = excel.ReadOrgUnits(file.OpenReadStream()).ToList();
+            var duplicateCodes = rows.GroupBy(x => x.Code, StringComparer.OrdinalIgnoreCase)
+                .Where(g => g.Count() > 1).Select(g => g.Key).ToList();
+
+            if (duplicateCodes.Count > 0)
+            {
+                TempData["Error"] = "کد واحدهای تکراری در فایل: " + string.Join("، ", duplicateCodes);
+                return RedirectToAction(nameof(OrgUnits));
+            }
+
+            if (rows.Any(x => string.IsNullOrWhiteSpace(x.Code) || string.IsNullOrWhiteSpace(x.Title)))
+            {
+                TempData["Error"] = "کد و عنوان تمام واحدها در فایل باید تکمیل باشد.";
+                return RedirectToAction(nameof(OrgUnits));
+            }
+
+            var all = await db.OrgUnits.ToListAsync();
+            foreach (var r in rows)
+            {
+                var existing = all.SingleOrDefault(x => x.Code.Equals(r.Code, StringComparison.OrdinalIgnoreCase));
+                if (existing == null)
+                {
+                    existing = new OrgUnit { Code = r.Code.Trim(), Title = r.Title.Trim(), IsActive = true };
+                    db.OrgUnits.Add(existing);
+                    all.Add(existing);
+                }
+                else
+                {
+                    existing.Title = r.Title.Trim();
+                    existing.IsActive = true;
+                }
+            }
+
+            await db.SaveChangesAsync();
+            all = await db.OrgUnits.ToListAsync();
+
+            var byCode = all.ToDictionary(x => x.Code.Trim(), StringComparer.OrdinalIgnoreCase);
+            foreach (var r in rows)
+            {
+                var node = byCode[r.Code.Trim()];
+                if (string.IsNullOrWhiteSpace(r.ParentCode))
+                    node.ParentId = null;
+                else if (!byCode.TryGetValue(r.ParentCode.Trim(), out var parent) || parent.Id == node.Id)
+                {
+                    TempData["Error"] = $"والد واحد «{r.Code}» معتبر نیست: «{r.ParentCode}».";
+                    return RedirectToAction(nameof(OrgUnits));
+                }
+                else
+                    node.ParentId = parent.Id;
+            }
+
+            var cycleIds = FindOrgCycles(all);
+            if (cycleIds.Count > 0)
+            {
+                TempData["Error"] = "فایل باعث ایجاد حلقه در ساختار سازمانی می‌شود. واحدهای درگیر: " +
+                                    string.Join("، ", all.Where(x => cycleIds.Contains(x.Id)).Select(x => x.Code));
+                return RedirectToAction(nameof(OrgUnits));
+            }
+
+            await db.SaveChangesAsync();
+            TempData["Result"] = $"{rows.Count} واحد سازمانی از Excel وارد/به‌روزرسانی شد.";
+        }
+        catch (Exception ex)
+        {
+            TempData["Error"] = "فایل ساختار سازمانی قابل پردازش نیست: " + ex.Message;
+        }
+
+        return RedirectToAction(nameof(OrgUnits));
+    }
+
+    private static HashSet<int> FindOrgCycles(List<OrgUnit> units)
+    {
+        var map = units.ToDictionary(x => x.Id, x => x.ParentId);
+        var cyclic = new HashSet<int>();
+
+        foreach (var start in map.Keys)
+        {
+            var seen = new Dictionary<int, int>();
+            var current = start;
+            while (map.ContainsKey(current))
+            {
+                if (seen.TryGetValue(current, out var index))
+                {
+                    foreach (var id in seen.Where(x => x.Value >= index).Select(x => x.Key))
+                        cyclic.Add(id);
+                    break;
+                }
+
+                seen[current] = seen.Count;
+                var parent = map[current];
+                if (!parent.HasValue) break;
+                current = parent.Value;
+            }
+        }
+
+        return cyclic;
     }
 
     [HttpGet] public async Task<IActionResult> ExportPositions(){var rows=await db.Positions.Include(x=>x.QuestionMappings).AsNoTracking().OrderBy(x=>x.Title).ToListAsync();return File(excel.Positions(rows),"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","Positions.xlsx");}
