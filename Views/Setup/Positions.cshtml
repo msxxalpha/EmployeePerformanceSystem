@@ -13,8 +13,67 @@
   </form>
 </div>
 <div class="row g-3">
-@foreach(var p in Model){<div class="col-xl-6"><div class="table-panel h-100">
-  <div class="card-heading"><div><span class="eyebrow">@p.Code</span><h4>@p.Title</h4></div><div class="score-total"><span>سقف کل</span><b>@p.QuestionMappings.Where(x=>x.IsActive).Sum(x=>x.MaxScore).ToString("0.##")</b></div></div>
-  @if(!p.QuestionMappings.Any(x=>x.IsActive)){<div class="empty-inline">هیچ سؤال فعالی متصل نیست.</div>}else{<div class="table-responsive"><table class="table modern-table"><thead><tr><th>سؤال</th><th>حوزه</th><th>سقف</th><th>ترتیب</th></tr></thead><tbody>@foreach(var m in p.QuestionMappings.Where(x=>x.IsActive).OrderBy(x=>x.SortOrder)){<tr><td>@m.Question?.Title</td><td><span class="domain-chip">@m.Question?.EvaluationDomain?.Title</span></td><td>@m.MaxScore.ToString("0.##")</td><td>@m.SortOrder</td></tr>}</tbody></table></div>}
-</div></div>}
+@foreach(var p in Model){
+    var activeMappings = p.QuestionMappings.Where(x=>x.IsActive).OrderBy(x=>x.SortOrder).ToList();
+    var mappedQuestionIds = activeMappings.Select(x=>x.QuestionId).ToHashSet();
+    var availableQuestions = p.QuestionMappings.Count == 0
+        ? ViewBag.AvailableQuestions as List<Question> ?? new List<Question>()
+        : ViewBag.AvailableQuestions as List<Question> ?? new List<Question>();
+    <div class="col-xl-6"><div class="table-panel h-100">
+        <div class="card-heading"><div><span class="eyebrow">@p.Code</span><h4>@p.Title</h4><small class="text-muted">مدیریت سؤال‌های اختصاصی این رده</small></div><div class="score-total"><span>سقف کل</span><b>@activeMappings.Sum(x=>x.MaxScore).ToString("0.##")</b></div></div>
+
+        <div class="mapping-add-box">
+            <div class="mapping-add-title"><b>افزودن سؤال به این رده</b><span>سؤال موجود را انتخاب و سقف امتیاز مخصوص این رده را تعیین کنید.</span></div>
+            <form method="post" action="/Setup/AssignQuestion" class="row g-2 align-items-end">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="positionId" value="@p.Id">
+                <div class="col-12"><label class="form-label">سؤال</label>
+                    <select name="questionId" class="form-select" required>
+                        <option value="">انتخاب سؤال</option>
+                        @foreach(var q in availableQuestions.Where(x=>x.IsActive && !mappedQuestionIds.Contains(x.Id)).OrderBy(x=>x.Title))
+                        {
+                            <option value="@q.Id">@q.Code — @q.Title</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-6"><label class="form-label">سقف امتیاز</label><input name="maxScore" class="form-control" type="number" min=".01" step=".01" required></div>
+                <div class="col-md-3"><label class="form-label">ترتیب</label><input name="sortOrder" class="form-control" type="number" min="1" value="@(activeMappings.Count+1)"></div>
+                <div class="col-md-3"><button class="btn btn-main w-100" type="submit">افزودن</button></div>
+            </form>
+        </div>
+
+        @if(activeMappings.Count==0)
+        {
+            <div class="empty-inline">هیچ سؤال فعالی متصل نیست.</div>
+        }
+        else
+        {
+            <div class="table-responsive"><table class="table modern-table position-question-table"><thead><tr><th>سؤال</th><th>حوزه</th><th>سقف</th><th>ترتیب</th><th>عملیات</th></tr></thead><tbody>
+            @foreach(var m in activeMappings)
+            {
+                <tr>
+                    <td><b>@m.Question?.Title</b><div class="question-code">@m.Question?.Code</div></td>
+                    <td><span class="domain-chip">@m.Question?.EvaluationDomain?.Title</span></td>
+                    <td colspan="2">
+                        <form method="post" action="/Setup/UpdateQuestionMapping" class="mapping-edit-form">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="mappingId" value="@m.Id">
+                            <input name="maxScore" class="form-control" type="number" min=".01" step=".01" value="@m.MaxScore.ToString("0.##")" title="سقف امتیاز">
+                            <input name="sortOrder" class="form-control" type="number" min="1" value="@m.SortOrder" title="ترتیب">
+                            <button class="btn btn-sm btn-outline-primary" type="submit">ویرایش</button>
+                        </form>
+                    </td>
+                    <td>
+                        <form method="post" action="/Setup/RemoveQuestion" class="inline-form" onsubmit="return confirm('سؤال «@m.Question?.Title» از این رده پستی حذف شود؟');">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="mappingId" value="@m.Id">
+                            <button class="btn btn-sm btn-outline-danger" type="submit">حذف</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+            </tbody></table></div>
+        }
+    </div></div>
+}
 </div>
