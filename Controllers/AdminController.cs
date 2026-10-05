@@ -12,11 +12,31 @@ public class AdminController(AppDbContext db, ExcelService excel, PerformanceSer
 {
     private static readonly string ExcelMime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
-    public async Task<IActionResult> Periods()
+    public async Task<IActionResult> Periods(int page = 1, int pageSize = 25, int deletedPage = 1, int deletedPageSize = 25)
     {
         await ps.SyncExpiredPeriodsAsync();
-        var rows = await db.Periods.AsNoTracking().OrderByDescending(x => x.StartAt).ToListAsync();
-        return View(rows);
+
+        pageSize = Paging.NormalizePageSize(pageSize);
+        deletedPageSize = Paging.NormalizePageSize(deletedPageSize);
+
+        var activeQuery = db.Periods.AsNoTracking().Where(x => !x.IsDeleted);
+        var deletedQuery = db.Periods.AsNoTracking().Where(x => x.IsDeleted);
+
+        var activeTotal = await activeQuery.CountAsync();
+        var deletedTotal = await deletedQuery.CountAsync();
+
+        var activePages = Paging.TotalPages(activeTotal, pageSize);
+        var deletedPages = Paging.TotalPages(deletedTotal, deletedPageSize);
+
+        page = Paging.NormalizePage(page, activePages);
+        deletedPage = Paging.NormalizePage(deletedPage, deletedPages);
+
+        var activeRows = await activeQuery.OrderByDescending(x => x.StartAt)
+            .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+        var deletedRows = await deletedQuery.OrderByDescending(x => x.DeletedAt)
+            .Skip((deletedPage - 1) * deletedPageSize).Take(deletedPageSize).ToListAsync();
+
+        return View(new PeriodListVm(activeRows, deletedRows, activeTotal, page, pageSize, deletedTotal, deletedPage, deletedPageSize));
     }
 
     [HttpPost, ValidateAntiForgeryToken]
@@ -213,17 +233,23 @@ public class AdminController(AppDbContext db, ExcelService excel, PerformanceSer
     }
 
     [HttpGet]
-    public async Task<IActionResult> Employees(string? q)
+    public async Task<IActionResult> Employees(string? q, int page = 1, int pageSize = 25)
     {
-        var query = db.Employees.Include(e => e.Position).Include(e => e.Unit).AsNoTracking();
-        if (!string.IsNullOrWhiteSpace(q))
-        {
-            q = q.Trim();
-            query = query.Where(e => e.FullName.Contains(q) || e.PersonnelNo.Contains(q) || e.NationalNo.Contains(q));
-        }
+        pageSize = Paging.NormalizePageSize(pageSize);
+        q = (q ?? "").Trim();
 
-        var rows = await query.OrderBy(e => e.FullName).ToListAsync();
-        return View(rows);
+        var query = db.Employees.Include(e => e.Position).Include(e => e.Unit).AsNoTracking();
+        if (q != "")
+            query = query.Where(e => e.FullName.Contains(q) || e.PersonnelNo.Contains(q) || e.NationalNo.Contains(q));
+
+        var total = await query.CountAsync();
+        var totalPages = Paging.TotalPages(total, pageSize);
+        page = Paging.NormalizePage(page, totalPages);
+
+        var rows = await query.OrderBy(e => e.FullName)
+            .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+
+        return View(new EmployeesListVm(rows, total, page, pageSize, q));
     }
 
     [HttpGet]
@@ -561,6 +587,13 @@ public class AdminController(AppDbContext db, ExcelService excel, PerformanceSer
         public string NewPassword { get; set; } = "";
         public string ConfirmPassword { get; set; } = "";
     }
+
+    public record PeriodListVm(
+        List<EvaluationPeriod> ActiveRows,
+        List<EvaluationPeriod> DeletedRows,
+        int ActiveTotalCount, int ActivePage, int ActivePageSize,
+        int DeletedTotalCount, int DeletedPage, int DeletedPageSize);
+    public record EmployeesListVm(List<Employee> Rows, int TotalCount, int Page, int PageSize, string Search);
 
     public record EvaluationDetailsVm(Evaluation Evaluation, Employee? Employee, string Evaluator, List<ScoreAdminRow> Scores, List<HistoryAdminRow> History);
     public record ScoreAdminRow(string Code, string Title, string Domain, decimal Score, decimal MaxScore, string? Comment);
