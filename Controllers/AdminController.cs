@@ -83,26 +83,36 @@ public class AdminController(AppDbContext db, ExcelService excel, PerformanceSer
     }
 
     [HttpGet]
-    public async Task<IActionResult> PeriodDetails(int id)
+    public async Task<IActionResult> PeriodDetails(int id, string? q, int page = 1, int pageSize = 25)
     {
         await ps.SyncExpiredPeriodsAsync();
         var period = await db.Periods.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id);
         if (period == null) return NotFound();
 
-        var evaluations = await (
+        var query =
             from ev in db.Evaluations.AsNoTracking()
             join emp in db.Employees.AsNoTracking() on ev.EmployeeId equals emp.Id
             join evaluator in db.Employees.AsNoTracking() on ev.EvaluatorId equals evaluator.Id
             join pos in db.Positions.AsNoTracking() on emp.PositionId equals pos.Id
             join unit in db.OrgUnits.AsNoTracking() on emp.UnitId equals unit.Id
             where ev.PeriodId == id
-            orderby emp.FullName
             select new PeriodEvaluationRow(
                 ev.Id, emp.Id, emp.FullName, emp.PersonnelNo, pos.Title, unit.Title,
-                evaluator.FullName, ev.FinalScore, ev.FinalMaxScore, ev.Status.ToString()))
-            .ToListAsync();
+                evaluator.FullName, ev.FinalScore, ev.FinalMaxScore, ev.Status.ToString());
 
-        return View(new PeriodDetailsVm(period, evaluations));
+        q = (q ?? "").Trim();
+        if (q != "")
+            query = query.Where(x => x.Employee.Contains(q) || x.PersonnelNo.Contains(q) || x.Unit.Contains(q) || x.Evaluator.Contains(q) || x.Position.Contains(q));
+
+        var total = await query.CountAsync();
+        var totalPages = Paging.TotalPages(total, Paging.NormalizePageSize(pageSize));
+        pageSize = Paging.NormalizePageSize(pageSize);
+        page = Paging.NormalizePage(page, totalPages);
+
+        var evaluations = await query.OrderBy(x => x.Employee)
+            .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+
+        return View(new PeriodDetailsVm(period, evaluations, total, page, pageSize, q));
     }
 
     [HttpGet]
@@ -611,6 +621,6 @@ public class AdminController(AppDbContext db, ExcelService excel, PerformanceSer
         public PeriodEditVm(int id,string title,string startJalali,string endJalali,string? description,bool isOpen)
         { Id=id; Title=title; StartJalali=startJalali; EndJalali=endJalali; Description=description; IsOpen=isOpen; }
     }
-    public record PeriodDetailsVm(EvaluationPeriod Period, List<PeriodEvaluationRow> Evaluations);
+    public record PeriodDetailsVm(EvaluationPeriod Period, List<PeriodEvaluationRow> Evaluations, int TotalCount, int Page, int PageSize, string Search);
     public record PeriodEvaluationRow(int EvaluationId, int EmployeeId, string Employee, string PersonnelNo, string Position, string Unit, string Evaluator, decimal Score, decimal Max, string Status);
 }
