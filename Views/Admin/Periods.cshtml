@@ -11,7 +11,40 @@
 <div class="col-lg-3 col-md-6"><label class="form-label">تاریخ پایان *</label><div class="jalali-input"><input name="endJalali" class="form-control" data-jalali-date required><button type="button" class="date-trigger" data-jalali-trigger>▣</button></div></div>
 <div class="col-lg-3 col-md-6"><label class="form-label">توضیحات</label><input name="description" class="form-control"></div>
 <div class="col-12 d-flex justify-content-end"><button class="btn btn-main px-4">ایجاد دوره</button></div></form></div>
-<div class="table-panel"><div class="toolbar"><input class="form-control" data-table-filter="#periods" placeholder="جست‌وجوی دوره..."><span class="form-hint">تعداد: @Model.Count</span></div>
-<div class="table-responsive"><table id="periods" class="table modern-table"><thead><tr><th>عنوان</th><th>شروع</th><th>پایان</th><th>وضعیت</th><th>توضیحات</th><th>عملیات</th></tr></thead><tbody>
-@foreach(var p in Model){var active=p.IsOpen&&p.EndAt>=now;var started=p.StartAt<=now; <tr><td class="fw-bold">@p.Title</td><td>@p.StartJalali</td><td>@p.EndJalali</td><td><span class="status-chip @(active?"status-open":"status-closed")">@(active?(started?"فعال و قابل ثبت":"فعال و در انتظار شروع"):"بسته")</span></td><td class="text-muted">@(string.IsNullOrWhiteSpace(p.Description)?"—":p.Description)</td><td><div class="toolbar-actions"><a class="btn btn-sm btn-outline-primary" href="/Admin/PeriodDetails?id=@p.Id">جزئیات</a><a class="btn btn-sm btn-outline-secondary" href="/Admin/EditPeriod?id=@p.Id">ویرایش</a>@if(active){<form method="post" action="/Admin/DeactivatePeriod" class="inline-form">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@p.Id"><button class="btn btn-sm btn-outline-secondary" type="submit">غیرفعال</button></form>}</div></td></tr> }
-</tbody></table></div></div>
+@{
+    var activeRows = Model.Where(x => !x.IsDeleted).ToList();
+    var deletedRows = Model.Where(x => x.IsDeleted).ToList();
+}
+<div class="table-panel mb-4">
+    <div class="toolbar"><input class="form-control" data-table-filter="#periods" placeholder="جست‌وجوی دوره..."><span class="form-hint">تعداد دوره‌های فعال/بسته: @activeRows.Count</span></div>
+    <div class="table-responsive"><table id="periods" class="table modern-table"><thead><tr><th>عنوان</th><th>شروع</th><th>پایان</th><th>وضعیت</th><th>توضیحات</th><th>عملیات</th></tr></thead><tbody>
+    @foreach(var p in activeRows){var active=p.IsOpen&&p.EndAt>=now;var started=p.StartAt<=now;
+        <tr><td class="fw-bold">@p.Title</td><td>@p.StartJalali</td><td>@p.EndJalali</td>
+        <td><span class="status-chip @(active?"status-open":"status-closed")">@(active?(started?"فعال و قابل ثبت":"فعال و در انتظار شروع"):"بسته")</span></td>
+        <td class="text-muted">@(string.IsNullOrWhiteSpace(p.Description)?"—":p.Description)</td>
+        <td><div class="toolbar-actions">
+            <a class="btn btn-sm btn-outline-primary" href="/Admin/PeriodDetails?id=@p.Id">جزئیات</a>
+            <a class="btn btn-sm btn-outline-secondary" href="/Admin/EditPeriod?id=@p.Id">ویرایش</a>
+            @if(active){<form method="post" action="/Admin/DeactivatePeriod" class="inline-form">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@p.Id"><button class="btn btn-sm btn-outline-secondary" type="submit">غیرفعال</button></form>}
+            <form method="post" action="/Admin/DeletePeriod" class="inline-form" onsubmit="return confirm('این دوره و تمام نتایج ارزیابی آن حذف می‌شود و فقط عنوان دوره در بخش دوره‌های حذف‌شده باقی می‌ماند. ادامه می‌دهید؟');">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@p.Id"><button class="btn btn-sm btn-outline-danger" type="submit">حذف دوره</button></form>
+        </div></td></tr>
+    }
+    </tbody></table></div>
+</div>
+
+<div class="table-panel">
+    <div class="panel-title"><div><h4>دوره‌های حذف‌شده</h4><span>خود دوره و مشخصات زمانی آن برای سابقه نگهداری می‌شود؛ نتایج و اثرات ارزیابی آن در سامانه دیگر محاسبه نمی‌شوند.</span></div><span class="panel-badge">@(deletedRows.Count) دوره</span></div>
+    @if(deletedRows.Count==0)
+    {
+        <div class="empty-inline">هنوز دوره‌ای حذف نشده است.</div>
+    }
+    else
+    {
+        <div class="table-responsive"><table class="table modern-table"><thead><tr><th>عنوان دوره</th><th>بازه</th><th>تاریخ حذف</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody>
+        @foreach(var p in deletedRows)
+        {
+            <tr><td class="fw-bold">حذف‌شده — @p.Title</td><td>@p.StartJalali تا @p.EndJalali</td><td>@(p.DeletedAt.HasValue ? p.DeletedAt.Value.ToString("yyyy/MM/dd HH:mm") : "—")</td><td><span class="status-chip status-closed">حذف‌شده</span></td><td><a class="btn btn-sm btn-outline-primary" href="/Admin/PeriodDetails?id=@p.Id">مشاهده سابقه دوره</a></td></tr>
+        }
+        </tbody></table></div>
+    }
+</div>
