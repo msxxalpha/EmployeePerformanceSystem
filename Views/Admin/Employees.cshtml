@@ -1,10 +1,14 @@
-@model List<Employee>
+@model AdminController.EmployeesListVm
 @{ ViewData["Title"]="مدیریت کارکنان"; }
 <div class="page-header"><div><div class="eyebrow">مدیریت منابع انسانی</div><h2>کارکنان</h2><p class="text-muted">افزودن، ویرایش و غیرفعال‌سازی کارکنان و حساب ورود آنها.</p></div><div class="toolbar-actions"><a class="btn btn-main" href="/Admin/CreateEmployee">+ افزودن کارمند</a><a class="btn btn-outline-primary" href="/Admin/ImportEmployees">ورود Excel</a><a class="btn btn-outline-secondary" href="/Admin/ExportEmployees">خروجی Excel</a></div></div>
-<div class="toolbar"><input class="form-control" data-table-filter="#employees" placeholder="جست‌وجوی نام، پرسنلی یا کد ملی..."><span class="form-hint">تعداد کارکنان: @Model.Count</span></div>
+<div class="toolbar"><form class="toolbar" method="get" action="/Admin/Employees"><input class="form-control" name="q" value="@Model.Search" placeholder="جست‌وجوی نام، پرسنلی یا کد ملی..."><select class="form-select page-size-select" name="pageSize" onchange="this.form.submit()"><option value="25" selected="@(Model.PageSize==25)">25 ردیف</option><option value="50" selected="@(Model.PageSize==50)">50 ردیف</option><option value="75" selected="@(Model.PageSize==75)">75 ردیف</option><option value="100" selected="@(Model.PageSize==100)">100 ردیف</option></select><button class="btn btn-outline-primary" type="submit">جست‌وجو</button></form><span class="form-hint">تعداد کارکنان: @Model.TotalCount</span></div>
+@{var totalPages=Math.Max(1,(int)Math.Ceiling(Model.TotalCount/(double)Model.PageSize));}
+@await Html.PartialAsync("_TablePagination",(Model.Page,totalPages,Model.PageSize,Model.Search??"","/Admin/Employees",""))
 <div class="table-panel"><div class="table-responsive"><table id="employees" class="table modern-table"><thead><tr><th>پرسنلی</th><th>نام</th><th>رده</th><th>واحد</th><th>ارزیاب</th><th>سرپرست</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody>
-@foreach(var e in Model){<tr>
+@foreach(var e in Model.Rows){<tr>
 <td><span class="code-chip">@e.PersonnelNo</span></td><td class="fw-bold">@e.FullName</td><td>@e.Position?.Title</td><td>@e.Unit?.Title</td><td>@(e.IsEvaluator?"بله":"خیر")</td><td>@e.SupervisorId</td><td><span class="status-chip @(e.IsActive?"status-open":"status-closed")">@(e.IsActive?"فعال":"غیرفعال")</span></td>
 <td><div class="toolbar-actions"><a class="btn btn-sm btn-outline-primary" href="/Admin/EditEmployee?id=@e.Id">ویرایش</a><a class="btn btn-sm btn-outline-secondary" href="/Admin/ChangePassword?id=@e.Id">تغییر رمز</a>@if(e.IsActive){<form method="post" action="/Admin/DeactivateEmployee" class="inline-form">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@e.Id"><button class="btn btn-sm btn-outline-secondary" type="submit">غیرفعال‌سازی</button></form>}else{<form method="post" action="/Admin/ActivateEmployee" class="inline-form">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@e.Id"><button class="btn btn-sm btn-main" type="submit">فعال‌سازی</button></form>}</div></td>
 </tr>}
-</tbody></table></div></div>
+</tbody></table></div>
+@await Html.PartialAsync("_TablePagination",(Model.Page,totalPages,Model.PageSize,Model.Search??"","/Admin/Employees",""))
+</div>
