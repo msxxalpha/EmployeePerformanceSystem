@@ -268,5 +268,6 @@ public class SetupController(AppDbContext db, ExcelService excel) : Controller
     [HttpGet] public async Task<IActionResult> ExportOrgUnits(){var rows=await db.OrgUnits.AsNoTracking().OrderBy(x=>x.Title).ToListAsync();return File(excel.OrgUnits(rows),"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet","OrgUnits.xlsx");}
 
     public record QuestionsVm(List<Question> Questions, List<Position> Positions, List<EvaluationDomain> Domains);
+    public record PositionsVm(List<Position> Positions, List<Question> Questions);
     public record OrgUnitsVm(List<OrgUnit> Units, List<OrgUnit> ParentOptions);
 }
