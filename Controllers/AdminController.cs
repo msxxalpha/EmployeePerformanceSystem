@@ -96,9 +96,20 @@ public class AdminController(AppDbContext db, ExcelService excel, PerformanceSer
             join pos in db.Positions.AsNoTracking() on emp.PositionId equals pos.Id
             join unit in db.OrgUnits.AsNoTracking() on emp.UnitId equals unit.Id
             where ev.PeriodId == id
-            select new PeriodEvaluationRow(
-                ev.Id, emp.Id, emp.FullName, emp.PersonnelNo, pos.Title, unit.Title,
-                evaluator.FullName, ev.FinalScore, ev.FinalMaxScore, ev.Status.ToString());
+            select new
+            {
+                EvaluationId = ev.Id,
+                EmployeeId = emp.Id,
+                Employee = emp.FullName,
+                PersonnelNo = emp.PersonnelNo,
+                Position = pos.Title,
+                Unit = unit.Title,
+                Evaluator = evaluator.FullName,
+                Score = ev.FinalScore,
+                Max = ev.FinalMaxScore,
+                Status = ev.Status
+            };
+
 
         q = (q ?? "").Trim();
         if (q != "")
@@ -109,8 +120,12 @@ public class AdminController(AppDbContext db, ExcelService excel, PerformanceSer
         pageSize = Paging.NormalizePageSize(pageSize);
         page = Paging.NormalizePage(page, totalPages);
 
-        var evaluations = await query.OrderBy(x => x.Employee)
+        var rawEvaluations = await query.OrderBy(x => x.Employee)
             .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+
+        var evaluations = rawEvaluations.Select(x => new PeriodEvaluationRow(
+            x.EvaluationId, x.EmployeeId, x.Employee, x.PersonnelNo, x.Position, x.Unit,
+            x.Evaluator, x.Score, x.Max, x.Status.ToString())).ToList();
 
         return View(new PeriodDetailsVm(period, evaluations, total, page, pageSize, q));
     }
