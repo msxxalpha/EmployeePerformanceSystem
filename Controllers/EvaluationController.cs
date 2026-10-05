@@ -14,7 +14,7 @@ public class EvaluationController(AppDbContext db, PerformanceService ps, ExcelS
     private const string ExcelMime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
     [HttpGet]
-    public async Task<IActionResult> Index(int? periodId)
+    public async Task<IActionResult> Index(int? periodId, string? q, int page = 1, int pageSize = 25)
     {
         if (!TryEvaluator(out var evaluatorId) || !await ps.IsEvaluator(evaluatorId)) return Forbid();
         await ps.SyncExpiredPeriodsAsync();
@@ -65,6 +65,23 @@ public class EvaluationController(AppDbContext db, PerformanceService ps, ExcelS
                 ev != null && ev.EvaluatorId != evaluatorId);
         }).Where(x => selected == null || selected.EndAt >= DateTime.Now || x.EvaluationId.HasValue).ToList();
 
+        q = (q ?? "").Trim();
+        var allTableRows = rows;
+        if (q != "")
+        {
+            allTableRows = allTableRows.Where(e =>
+                e.Name.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                e.PersonnelNo.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                e.Position.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                e.Unit.Contains(q, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
+
+        pageSize = Paging.NormalizePageSize(pageSize);
+        var totalRows = allTableRows.Count;
+        var totalPages = Paging.TotalPages(totalRows, pageSize);
+        page = Paging.NormalizePage(page, totalPages);
+        rows = allTableRows.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+
         var questionIds = evaluations.SelectMany(x => x.Scores).Select(x => x.QuestionId).Distinct().ToList();
         var questionMap = questionIds.Count == 0 ? new Dictionary<int, Question>() : await db.Questions.AsNoTracking().Where(x => questionIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id);
         var analytics = BuildAnalytics(evaluations, employees, questionMap);
@@ -80,7 +97,7 @@ public class EvaluationController(AppDbContext db, PerformanceService ps, ExcelS
 
         return View(new DashboardVm(
             selected, active, periods, periodOptions, rows, analytics.TopPerformers, analytics.Improvements,
-            analytics.QuestionAverages, totalMaxScore, totalUsedScore, totalDeductedScore, message));
+            analytics.QuestionAverages, totalMaxScore, totalUsedScore, totalDeductedScore, totalRows, page, pageSize, q, message));
     }
 
     [HttpPost, ValidateAntiForgeryToken]
@@ -450,6 +467,10 @@ public class EvaluationController(AppDbContext db, PerformanceService ps, ExcelS
         decimal TotalMaxScore,
         decimal TotalUsedScore,
         decimal TotalDeductedScore,
+        int TotalRowCount,
+        int Page,
+        int PageSize,
+        string Search,
         string? Message);
     public record PeriodOptionVm(int Id, string Title, bool IsActive, bool IsClosed, bool HasEvaluations);
     public record Row(int Id,int? EvaluationId,string Name,string PersonnelNo,string Position,string Unit,bool IsEvaluator,string Status,decimal Total,decimal Max,decimal Percentage,string CurrentEvaluator,bool IsTakeover);
