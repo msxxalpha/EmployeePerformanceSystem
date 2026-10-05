@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Indamin.Performance.Data;
 using Indamin.Performance.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -113,9 +114,10 @@ public class AdminController(AppDbContext db, ExcelService excel, PerformanceSer
     {
         var p = await db.Periods.FindAsync(id);
         if (p == null) return NotFound();
+        if (p.IsDeleted) return BadRequest("دوره حذف‌شده قابل ویرایش نیست.");
         await ps.SyncExpiredPeriodsAsync();
         p = await db.Periods.FindAsync(id);
-        if (p == null) return NotFound();
+        if (p == null || p.IsDeleted) return NotFound();
         return View("PeriodEdit", new PeriodEditVm(p.Id, p.Title, p.StartJalali, p.EndJalali, p.Description, p.IsOpen && p.EndAt >= DateTime.Now));
     }
 
@@ -124,6 +126,11 @@ public class AdminController(AppDbContext db, ExcelService excel, PerformanceSer
     {
         var p = await db.Periods.FindAsync(model.Id);
         if (p == null) return NotFound();
+        if (p.IsDeleted)
+        {
+            TempData["Error"] = "دوره حذف‌شده قابل ویرایش نیست.";
+            return RedirectToAction(nameof(Periods));
+        }
 
         try
         {
@@ -157,9 +164,43 @@ public class AdminController(AppDbContext db, ExcelService excel, PerformanceSer
     {
         var p = await db.Periods.FindAsync(id);
         if (p == null) return NotFound();
+        if (p.IsDeleted) return BadRequest("دوره حذف‌شده قابل غیرفعال‌سازی نیست.");
         p.IsOpen = false;
         await db.SaveChangesAsync();
         TempData["Result"] = "دوره غیرفعال شد و دیگر نتیجه جدید دریافت نمی‌کند.";
+        return RedirectToAction(nameof(Periods));
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeletePeriod(int id)
+    {
+        var p = await db.Periods.SingleOrDefaultAsync(x => x.Id == id);
+        if (p == null) return NotFound();
+        if (p.IsDeleted)
+        {
+            TempData["Error"] = "این دوره قبلاً حذف شده است.";
+            return RedirectToAction(nameof(Periods));
+        }
+
+        var evaluations = await db.Evaluations.Where(x => x.PeriodId == id).ToListAsync();
+        db.Evaluations.RemoveRange(evaluations);
+
+        p.IsOpen = false;
+        p.IsDeleted = true;
+        p.DeletedAt = DateTime.Now;
+
+        var userId = int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var uid) ? uid : (int?)null;
+        db.AuditLogs.Add(new AuditLog
+        {
+            Action = "EvaluationPeriodDeleted",
+            Entity = "EvaluationPeriod",
+            EntityId = id.ToString(),
+            Details = $"PeriodId={id};DeletedEvaluations={evaluations.Count};Title={p.Title}",
+            UserId = userId
+        });
+
+        await db.SaveChangesAsync();
+        TempData["Result"] = $"دوره «{p.Title}» حذف شد و سوابق ارزیابی‌های آن از نتایج سامانه حذف شد. خود دوره در بخش «دوره‌های حذف‌شده» نگهداری می‌شود.";
         return RedirectToAction(nameof(Periods));
     }
 
