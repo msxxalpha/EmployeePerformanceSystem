@@ -10,7 +10,7 @@
 <div class="report-period-selector">
  <div><span>دوره منتخب</span><strong>@(d.Period?.Title??"هیچ دوره‌ای انتخاب نشده است")</strong>@if(d.Period!=null){<small>@d.Period.StartJalali تا @d.Period.EndJalali · @(d.Period.EndAt<DateTime.Now?"بسته":"در حال اجرا")</small>}</div>
  <form method="get"><label class="form-label">انتخاب دوره</label><select name="periodId" class="form-select" onchange="this.form.submit()"><option value="">انتخاب دوره</option>
- @foreach(var p in Model.Periods.Where(x=>x.StartAt<=DateTime.Now)){if(Model.SelectedPeriodId==p.Id){<option value="@p.Id" selected>@p.Title</option>}else{<option value="@p.Id">@p.Title</option>}}
+ @foreach(var p in Model.Periods.Where(x=>!x.IsDeleted && x.StartAt<=DateTime.Now)){if(Model.SelectedPeriodId==p.Id){<option value="@p.Id" selected>@p.Title</option>}else{<option value="@p.Id">@p.Title</option>}}
  </select></form>
 </div>
 @if(d.Period==null){<div class="empty-state report-empty"><div class="display-6">▥</div><strong>هنوز دوره‌ای برای گزارش انتخاب نشده است.</strong></div>}
