@@ -2,18 +2,22 @@
 @{ ViewData["Title"]="ساختار سازمانی"; }
 <div class="page-header">
   <div><div class="eyebrow">ساختار سازمان</div><h2>واحدهای سازمانی</h2><p class="text-muted">واحدهای سازمانی مستقل از زنجیره ارزیابی هستند؛ زنجیره ارزیابی با سرپرست مستقیم کارکنان تعریف می‌شود.</p></div>
-  <a class="btn btn-outline-secondary" href="/Setup/ExportOrgUnits">خروجی Excel</a>
+  <div class="toolbar-actions"><a class="btn btn-outline-secondary" href="/Setup/ExportOrgUnits">خروجی Excel</a><a class="btn btn-outline-primary" href="#import-org">ورود Excel</a></div>
 </div>
 <div class="form-panel mb-4">
   <div class="panel-title"><div><h4>افزودن واحد سازمانی</h4><span>واحد والد برای نمایش ساختار سازمانی انتخاب می‌شود.</span></div></div>
   <form method="post" action="/Setup/AddOrgUnit" class="row g-3">@Html.AntiForgeryToken()
-    <div class="col-md-3"><label class="form-label">کد واحد *</label><input name="code" class="form-control" maxlength="50" placeholder="U-01" required></div>
+    <div class="col-md-3"><label class="form-label">کد واحد *</label><input name="code" class="form-control" maxlength="50" value="@Model.NextCode"></div>
     <div class="col-md-5"><label class="form-label">عنوان واحد *</label><input name="title" class="form-control" maxlength="200" placeholder="مدیریت کیفیت" required></div>
     <div class="col-md-3"><label class="form-label">واحد والد</label><select name="parentId" class="form-select"><option value="">سطح اصلی</option>@foreach(var p in Model.ParentOptions){<option value="@p.Id">@p.Code — @p.Title</option>}</select></div>
     <div class="col-md-1 d-flex align-items-end"><button class="btn btn-main w-100" type="submit">+</button></div>
   </form>
 </div>
-<div class="toolbar"><input class="form-control table-search" data-table-filter="#units" placeholder="جست‌وجوی کد یا عنوان واحد..."><span class="form-hint">تعداد: @Model.Units.Count</span></div>
+<div id="import-org" class="form-panel mb-4"><div class="panel-title"><div><h4>ورود ساختار سازمانی از Excel</h4><span>فایل موجود را وارد یا به‌روزرسانی کنید؛ واحدهای موجود بر اساس کد به‌روزرسانی می‌شوند.</span></div></div><form method="post" enctype="multipart/form-data" action="/Setup/ImportOrgUnits">@Html.AntiForgeryToken()<input type="file" name="file" class="form-control mb-3" accept=".xlsx" required><button class="btn btn-main" type="submit">بارگذاری و پردازش</button></form><div class="excel-column-guide mt-3"><h5>راهنمای ستون‌های Excel</h5><div class="guide-columns"><div class="guide-col"><b><span class="num">1</span> کد واحد</b><small>Code — مانند ORG-001. یکتا و قابل ویرایش.</small></div><div class="guide-col"><b><span class="num">2</span> عنوان واحد</b><small>Title — نام کامل واحد سازمانی.</small></div><div class="guide-col"><b><span class="num">3</span> کد واحد والد</b><small>ParentCode — برای سطح ریشه خالی باشد.</small></div></div></div></div><div class="toolbar"><form class="toolbar" method="get" action="/Setup/OrgUnits"><input class="form-control" name="q" value="@Model.Search" placeholder="جست‌وجوی کد یا عنوان واحد..."><select class="form-select page-size-select" name="pageSize" onchange="this.form.submit()"><option value="25" selected="@(Model.PageSize==25)">25 ردیف</option><option value="50" selected="@(Model.PageSize==50)">50 ردیف</option><option value="75" selected="@(Model.PageSize==75)">75 ردیف</option><option value="100" selected="@(Model.PageSize==100)">100 ردیف</option></select><button class="btn btn-outline-primary" type="submit">جست‌وجو</button></form><span class="form-hint">تعداد: @Model.TotalCount</span></div>
+@{var totalPages=Math.Max(1,(int)Math.Ceiling(Model.TotalCount/(double)Model.PageSize));}
+@await Html.PartialAsync("_TablePagination",(Model.Page,totalPages,Model.PageSize,Model.Search??"","/Setup/OrgUnits",""))
 <div class="table-panel"><div class="table-responsive"><table id="units" class="table modern-table"><thead><tr><th>کد</th><th>عنوان</th><th>والد</th><th>وضعیت</th></tr></thead><tbody>
 @foreach(var u in Model.Units){var parent=Model.Units.FirstOrDefault(x=>x.Id==u.ParentId);<tr><td>@u.Code</td><td class="fw-bold">@u.Title</td><td>@(parent?.Title??"—")</td><td><span class="status-chip @(u.IsActive?"status-open":"status-closed")">@(u.IsActive?"فعال":"غیرفعال")</span></td></tr>}
-</tbody></table></div></div>
+</tbody></table></div>
+@await Html.PartialAsync("_TablePagination",(Model.Page,totalPages,Model.PageSize,Model.Search??"","/Setup/OrgUnits",""))
+</div>
