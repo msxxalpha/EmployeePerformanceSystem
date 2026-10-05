@@ -7,7 +7,7 @@
 <div class="form-panel mb-4">
   <div class="panel-title"><div><h4>ایجاد رده پستی</h4><span>ابتدا رده را ایجاد کنید؛ سپس سؤال‌ها را به آن متصل نمایید.</span></div></div>
   <form method="post" action="/Setup/AddPosition" class="row g-3">@Html.AntiForgeryToken()
-    <div class="col-md-4"><label class="form-label">کد رده *</label><input name="code" class="form-control" maxlength="50" placeholder="P-01" required></div>
+    <div class="col-md-4"><label class="form-label">کد رده *</label><input name="code" class="form-control" maxlength="50" value="@Model.NextCode"></div>
     <div class="col-md-5"><label class="form-label">عنوان رده *</label><input name="title" class="form-control" maxlength="200" placeholder="کارشناس" required></div>
     <div class="col-md-3 d-flex align-items-end"><button class="btn btn-main w-100" type="submit">ثبت رده پستی</button></div>
   </form>
