@@ -1,4 +1,4 @@
-@model List<EvaluationPeriod>
+@model AdminController.PeriodListVm
 @{ ViewData["Title"]="دوره‌های ارزیابی"; var now=DateTime.Now; }
 <div class="page-header">
 <div><div class="eyebrow">پیکربندی</div><h2>دوره‌های ارزیابی</h2><p class="text-muted">تعریف، ویرایش، مشاهده جزئیات و غیرفعال‌سازی دوره‌های ماهیانه.</p></div>
@@ -12,13 +12,15 @@
 <div class="col-lg-3 col-md-6"><label class="form-label">توضیحات</label><input name="description" class="form-control"></div>
 <div class="col-12 d-flex justify-content-end"><button class="btn btn-main px-4">ایجاد دوره</button></div></form></div>
 @{
-    var activeRows = Model.Where(x => !x.IsDeleted).ToList();
-    var deletedRows = Model.Where(x => x.IsDeleted).ToList();
+    var now = DateTime.Now;
+    var activeTotalPages = Math.Max(1,(int)Math.Ceiling(Model.ActiveTotalCount/(double)Model.ActivePageSize));
+    var deletedTotalPages = Math.Max(1,(int)Math.Ceiling(Model.DeletedTotalCount/(double)Model.DeletedPageSize));
 }
 <div class="table-panel mb-4">
-    <div class="toolbar"><input class="form-control" data-table-filter="#periods" placeholder="جست‌وجوی دوره..."><span class="form-hint">تعداد دوره‌های فعال/بسته: @activeRows.Count</span></div>
+    <div class="toolbar"><form class="toolbar" method="get" action="/Admin/Periods"><select class="form-select page-size-select" name="pageSize" onchange="this.form.submit()"><option value="25" selected="@(Model.ActivePageSize==25)">25 ردیف</option><option value="50" selected="@(Model.ActivePageSize==50)">50 ردیف</option><option value="75" selected="@(Model.ActivePageSize==75)">75 ردیف</option><option value="100" selected="@(Model.ActivePageSize==100)">100 ردیف</option></select><button class="btn btn-outline-primary" type="submit">اعمال</button></form><span class="form-hint">تعداد دوره‌های فعال/بسته: @Model.ActiveTotalCount</span></div>
+@await Html.PartialAsync("_TablePagination",(Model.ActivePage,activeTotalPages,Model.ActivePageSize,"","/Admin/Periods","deletedPage=@Model.DeletedPage&deletedPageSize=@Model.DeletedPageSize"))
     <div class="table-responsive"><table id="periods" class="table modern-table"><thead><tr><th>عنوان</th><th>شروع</th><th>پایان</th><th>وضعیت</th><th>توضیحات</th><th>عملیات</th></tr></thead><tbody>
-    @foreach(var p in activeRows){var active=p.IsOpen&&p.EndAt>=now;var started=p.StartAt<=now;
+    @foreach(var p in Model.ActiveRows){var active=p.IsOpen&&p.EndAt>=now;var started=p.StartAt<=now;
         <tr><td class="fw-bold">@p.Title</td><td>@p.StartJalali</td><td>@p.EndJalali</td>
         <td><span class="status-chip @(active?"status-open":"status-closed")">@(active?(started?"فعال و قابل ثبت":"فعال و در انتظار شروع"):"بسته")</span></td>
         <td class="text-muted">@(string.IsNullOrWhiteSpace(p.Description)?"—":p.Description)</td>
@@ -30,21 +32,23 @@
         </div></td></tr>
     }
     </tbody></table></div>
+@await Html.PartialAsync("_TablePagination",(Model.ActivePage,activeTotalPages,Model.ActivePageSize,"","/Admin/Periods","deletedPage=@Model.DeletedPage&deletedPageSize=@Model.DeletedPageSize"))
 </div>
 
 <div class="table-panel">
-    <div class="panel-title"><div><h4>دوره‌های حذف‌شده</h4><span>خود دوره و مشخصات زمانی آن برای سابقه نگهداری می‌شود؛ نتایج و اثرات ارزیابی آن در سامانه دیگر محاسبه نمی‌شوند.</span></div><span class="panel-badge">@(deletedRows.Count) دوره</span></div>
-    @if(deletedRows.Count==0)
+    <div class="panel-title"><div><h4>دوره‌های حذف‌شده</h4><span>خود دوره و مشخصات زمانی آن برای سابقه نگهداری می‌شود؛ نتایج و اثرات ارزیابی آن در سامانه دیگر محاسبه نمی‌شوند.</span></div><span class="panel-badge">@(Model.DeletedTotalCount) دوره</span></div>
+    @if(Model.DeletedTotalCount==0)
     {
         <div class="empty-inline">هنوز دوره‌ای حذف نشده است.</div>
     }
     else
     {
         <div class="table-responsive"><table class="table modern-table"><thead><tr><th>عنوان دوره</th><th>بازه</th><th>تاریخ حذف</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody>
-        @foreach(var p in deletedRows)
+        @foreach(var p in Model.DeletedRows)
         {
             <tr><td class="fw-bold">حذف‌شده — @p.Title</td><td>@p.StartJalali تا @p.EndJalali</td><td>@(p.DeletedAt.HasValue ? p.DeletedAt.Value.ToString("yyyy/MM/dd HH:mm") : "—")</td><td><span class="status-chip status-closed">حذف‌شده</span></td><td><a class="btn btn-sm btn-outline-primary" href="/Admin/PeriodDetails?id=@p.Id">مشاهده سابقه دوره</a></td></tr>
         }
         </tbody></table></div>
+        @await Html.PartialAsync("_TablePagination",(Model.DeletedPage,deletedTotalPages,Model.DeletedPageSize,"","/Admin/Periods","page=@Model.ActivePage&pageSize=@Model.ActivePageSize"))
     }
 </div>
