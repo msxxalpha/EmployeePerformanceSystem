@@ -9,7 +9,7 @@
   <form method="post" action="/Setup/AddOrgUnit" class="row g-3">@Html.AntiForgeryToken()
     <div class="col-md-3"><label class="form-label">کد واحد *</label><input name="code" class="form-control" maxlength="50" value="@Model.NextCode"></div>
     <div class="col-md-5"><label class="form-label">عنوان واحد *</label><input name="title" class="form-control" maxlength="200" placeholder="مدیریت کیفیت" required></div>
-    <div class="col-md-3"><label class="form-label">واحد والد</label><select name="parentId" class="form-select"><option value="">سطح اصلی</option>@foreach(var p in Model.ParentOptions){<option value="@p.Id">@p.Code — @p.Title</option>}</select></div>
+    <div class="col-md-3"><label class="form-label">واحد والد</label><select name="parentId" class="form-select"><option value="">سطح اصلی</option>@foreach(var p in Model.ParentOptions.Where(x=>x.IsActive)){<option value="@p.Id">@p.Code — @p.Title</option>}</select></div>
     <div class="col-md-1 d-flex align-items-end"><button class="btn btn-main w-100" type="submit">+</button></div>
   </form>
 </div>
