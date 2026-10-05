@@ -94,9 +94,12 @@
         {
             <div class="alert app-alert app-alert-info mt-3 mb-0"><span class="alert-icon">i</span><span>با «ارزیابی سریع»، افراد فاقد ارزیابی با امتیاز کامل همه سؤالات ثبت می‌شوند. سپس می‌توانید وارد جزئیات هر فرد شوید و امتیاز هر سؤال را کاهش دهید.</span></div>
         }
-        <div class="toolbar"><input class="form-control" data-table-filter="#evals" placeholder="جست‌وجوی نام، پرسنلی، رده یا واحد..."><span class="form-hint">مرتب‌سازی با کلیک روی عنوان ستون</span></div>
+        <div class="toolbar"><form class="toolbar" method="get" action="/Evaluation"><input type="hidden" name="periodId" value="@(selected?.Id)"><input class="form-control" name="q" value="@Model.Search" placeholder="جست‌وجوی نام، پرسنلی، رده یا واحد..."><select class="form-select page-size-select" name="pageSize" onchange="this.form.submit()"><option value="25" selected="@(Model.PageSize==25)">25 ردیف</option><option value="50" selected="@(Model.PageSize==50)">50 ردیف</option><option value="75" selected="@(Model.PageSize==75)">75 ردیف</option><option value="100" selected="@(Model.PageSize==100)">100 ردیف</option></select><button class="btn btn-outline-primary" type="submit">جست‌وجو</button></form><span class="form-hint">تعداد: @Model.TotalRowCount</span></div>
+@{var totalPages=Math.Max(1,(int)Math.Ceiling(Model.TotalRowCount/(double)Model.PageSize));}
+@await Html.PartialAsync("_TablePagination",(Model.Page,totalPages,Model.PageSize,Model.Search??"","/Evaluation",$"periodId={selected?.Id}"))
         <div class="table-responsive"><table id="evals" class="table modern-table"><thead><tr><th>کارمند</th><th>پرسنلی</th><th>رده</th><th>واحد</th><th>ارزیاب</th><th>امتیاز</th><th>درصد</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody>
         @foreach(var x in Model.Employees){<tr><td class="fw-bold">@x.Name @if(x.IsEvaluator){<span class="mini-tag">ارزیاب</span>}</td><td>@x.PersonnelNo</td><td>@x.Position</td><td>@x.Unit</td><td>@x.CurrentEvaluator</td><td>@x.Total / @x.Max</td><td><span class="score-pill">@x.Percentage.ToString("0.0")٪</span></td><td>@x.Status</td><td>@if(x.Status=="ثبت نشده" && selected.StartAt<=DateTime.Now && selected.EndAt>=DateTime.Now && selected.IsOpen){<a class="btn btn-sm btn-main" href="/Evaluation/Form?id=@x.Id&periodId=@selected.Id">ارزیابی</a>}else if(x.Status!="ثبت نشده"){<a class="btn btn-sm btn-outline-primary" href="/Evaluation/Review?evaluationId=@x.EvaluationId">جزئیات</a>}else{<span class="muted-box">دوره بسته</span>}</td></tr>}
         </tbody></table></div>
+        @await Html.PartialAsync("_TablePagination",(Model.Page,totalPages,Model.PageSize,Model.Search??"","/Evaluation",$"periodId={selected?.Id}"))
     </div>
 }
