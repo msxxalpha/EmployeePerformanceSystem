@@ -34,11 +34,11 @@ public class PerformanceService(AppDbContext db)
     }
 
     public Task<EvaluationPeriod?> CurrentPeriod() =>
-        db.Periods.Where(x => x.IsOpen && x.StartAt <= DateTime.Now && x.EndAt >= DateTime.Now)
+        db.Periods.Where(x => !x.IsDeleted && x.IsOpen && x.StartAt <= DateTime.Now && x.EndAt >= DateTime.Now)
             .OrderByDescending(x => x.StartAt).FirstOrDefaultAsync();
 
     public Task<List<EvaluationPeriod>> PreviousPeriods() =>
-        db.Periods.Where(x => x.StartAt <= DateTime.Now && x.EndAt < DateTime.Now)
+        db.Periods.Where(x => !x.IsDeleted && x.StartAt <= DateTime.Now && x.EndAt < DateTime.Now)
             .OrderByDescending(x => x.StartAt).ToListAsync();
 
     public Task<bool> CanEdit(EvaluationPeriod p) =>
@@ -159,7 +159,7 @@ public class PerformanceService(AppDbContext db)
     }
 
     public Task<EvaluationPeriod?> LatestStartedPeriod() =>
-        db.Periods.Where(x => x.StartAt <= DateTime.Now).OrderByDescending(x => x.StartAt).FirstOrDefaultAsync();
+        db.Periods.Where(x => !x.IsDeleted && x.StartAt <= DateTime.Now).OrderByDescending(x => x.StartAt).FirstOrDefaultAsync();
 
     public Task<DateTime> NowAsync() => Task.FromResult(DateTime.Now);
 }
