@@ -15,7 +15,7 @@ public class ReportsController(AppDbContext db, ExcelService excel) : Controller
     public async Task<IActionResult> Index(int? periodId)
     {
         var periods = await db.Periods.AsNoTracking().OrderByDescending(x => x.StartAt).ToListAsync();
-        var selectable = periods.Where(x => x.StartAt <= DateTime.Now).ToList();
+        var selectable = periods.Where(x => !x.IsDeleted && x.StartAt <= DateTime.Now).ToList();
         int? selectedId = periodId.HasValue && selectable.Any(x => x.Id == periodId.Value)
             ? periodId.Value
             : selectable.FirstOrDefault()?.Id;
@@ -27,7 +27,7 @@ public class ReportsController(AppDbContext db, ExcelService excel) : Controller
     [HttpGet]
     public async Task<IActionResult> Export(int? periodId)
     {
-        var selectable = await db.Periods.AsNoTracking().Where(x => x.StartAt <= DateTime.Now).OrderByDescending(x => x.StartAt).ToListAsync();
+        var selectable = await db.Periods.AsNoTracking().Where(x => !x.IsDeleted && x.StartAt <= DateTime.Now).OrderByDescending(x => x.StartAt).ToListAsync();
         var selectedId = periodId.HasValue && selectable.Any(x => x.Id == periodId.Value) ? periodId.Value : selectable.FirstOrDefault()?.Id ?? 0;
         var rows = await QueryRows(selectedId);
         return File(excel.Evaluations(rows.Select(x => (x.Employee, x.Evaluator, x.Unit, x.Position, x.Score, x.Max, x.Status))), ExcelMime, "ManagementEvaluationReport.xlsx");
@@ -35,7 +35,7 @@ public class ReportsController(AppDbContext db, ExcelService excel) : Controller
 
     private async Task<ReportData> BuildReport(int periodId)
     {
-        var period = await db.Periods.AsNoTracking().SingleOrDefaultAsync(x => x.Id == periodId);
+        var period = await db.Periods.AsNoTracking().SingleOrDefaultAsync(x => x.Id == periodId && !x.IsDeleted);
         var rows = await QueryRows(periodId);
         if (period == null) return EmptyReport();
         var evaluated = rows.Where(x => x.Max > 0).ToList();
