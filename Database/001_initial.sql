@@ -97,6 +97,8 @@ CREATE TABLE EvaluationPeriods(
     StartAt DATETIME2 NOT NULL,
     EndAt DATETIME2 NOT NULL,
     IsOpen BIT NOT NULL CONSTRAINT DF_EvaluationPeriods_IsOpen DEFAULT 1,
+    IsDeleted BIT NOT NULL CONSTRAINT DF_EvaluationPeriods_IsDeleted DEFAULT 0,
+    DeletedAt DATETIME2 NULL,
     Description NVARCHAR(1000) NULL,
     CONSTRAINT CK_EvaluationPeriods_DateRange CHECK(EndAt >= StartAt)
 );
