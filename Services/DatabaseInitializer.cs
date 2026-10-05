@@ -5,6 +5,13 @@ namespace Indamin.Performance.Services;
 
 public static class DatabaseInitializer
 {
+    private const string RequiredColumnSql = """
+        SELECT COUNT(*)
+        FROM sys.columns
+        WHERE object_id = OBJECT_ID('EvaluationPeriods')
+          AND name IN ('IsDeleted','DeletedAt')
+        """;
+
     private const string RequiredTableSql = """
         SELECT COUNT(*) AS [Value]
         FROM sys.tables
@@ -18,7 +25,11 @@ public static class DatabaseInitializer
     public static async Task InitializeAsync(AppDbContext db, string _)
     {
         var count = await db.Database.SqlQueryRaw<int>(RequiredTableSql).SingleAsync();
-        if (count != 13)
+        var columnCount = count == 13
+            ? await db.Database.SqlQueryRaw<int>(RequiredColumnSql).SingleAsync()
+            : 0;
+
+        if (count != 13 || columnCount != 2)
             throw new InvalidOperationException(
                 "ساختار پایگاه داده کامل نیست. برای نسخه فعلی، دیتابیس آزمایشی را خالی ایجاد و فقط فایل Database/001_initial.sql را اجرا کنید.");
     }
