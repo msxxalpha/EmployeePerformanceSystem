@@ -36,7 +36,7 @@
 </div>
 
 <div class="table-panel">
-    <div class="panel-title"><div><h4>دوره‌های حذف‌شده</h4><span>خود دوره و مشخصات زمانی آن برای سابقه نگهداری می‌شود؛ نتایج و اثرات ارزیابی آن در سامانه دیگر محاسبه نمی‌شوند.</span></div><span class="panel-badge">@(Model.DeletedTotalCount) دوره</span></div>
+    <div class="panel-title"><div><h4>دوره‌های حذف‌شده</h4><span>خود دوره و مشخصات زمانی آن برای سابقه نگهداری می‌شود؛ نتایج و اثرات ارزیابی آن در سامانه دیگر محاسبه نمی‌شوند.</span></div><span class="panel-badge">@(Model.DeletedTotalCount) دوره</span></div><div class="toolbar"><form class="toolbar" method="get" action="/Admin/Periods"><input type="hidden" name="page" value="@Model.ActivePage"><input type="hidden" name="pageSize" value="@Model.ActivePageSize"><select class="form-select page-size-select" name="deletedPageSize" onchange="this.form.submit()"><option value="25" selected="@(Model.DeletedPageSize==25)">25 ردیف</option><option value="50" selected="@(Model.DeletedPageSize==50)">50 ردیف</option><option value="75" selected="@(Model.DeletedPageSize==75)">75 ردیف</option><option value="100" selected="@(Model.DeletedPageSize==100)">100 ردیف</option></select><button class="btn btn-outline-primary" type="submit">اعمال</button></form><span class="form-hint">تعداد: @Model.DeletedTotalCount</span></div>
     @if(Model.DeletedTotalCount==0)
     {
         <div class="empty-inline">هنوز دوره‌ای حذف نشده است.</div>
