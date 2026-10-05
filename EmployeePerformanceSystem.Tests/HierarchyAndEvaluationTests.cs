@@ -42,6 +42,23 @@ public class HierarchyAndEvaluationTests
     }
 
     [Fact]
+    public void AutoCodeGeneratorCreatesNextThreeDigitCode()
+    {
+        var code = AutoCodeGenerator.Next(new[] { "Q-001", "Q-003", "Q-010", "OTHER-999" }, "Q");
+        Assert.Equal("Q-011", code);
+    }
+
+    [Fact]
+    public void PagingNormalizesPageSizeAndPages()
+    {
+        Assert.Equal(25, Paging.NormalizePageSize(10));
+        Assert.Equal(50, Paging.NormalizePageSize(50));
+        Assert.Equal(4, Paging.TotalPages(76, 25));
+        Assert.Equal(1, Paging.NormalizePage(0, 4));
+        Assert.Equal(4, Paging.NormalizePage(8, 4));
+    }
+
+    [Fact]
     public async Task UpperEvaluatorSeesCompleteSubtree()
     {
         var (db, service) = CreateDb(); AddHierarchy(db); await db.SaveChangesAsync();
