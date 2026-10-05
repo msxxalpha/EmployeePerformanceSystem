@@ -1,4 +1,4 @@
-@model List<EvaluationDomain>
+@model SetupController.DomainsVm
 @{ ViewData["Title"]="حوزه‌های ارزیابی"; }
 <div class="page-header"><div><div class="eyebrow">اطلاعات پایه</div><h2>حوزه‌های ارزیابی</h2><p class="text-muted">حوزه‌ها به صورت آیتم‌های استاندارد تعریف می‌شوند و هنگام ایجاد سؤال از این فهرست انتخاب می‌شوند.</p></div><a class="btn btn-outline-primary" href="/Setup/Questions">بانک سؤالات</a></div>
 <div class="form-panel mb-4"><div class="panel-title"><div><h4>افزودن حوزه ارزیابی</h4><span>کد، عنوان، توضیحات و ترتیب نمایش را مشخص کنید.</span></div><span class="panel-badge">اطلاعات پایه</span></div>
@@ -9,9 +9,13 @@
 <div class="col-lg-1 col-md-3"><label class="form-label">ترتیب</label><input name="sortOrder" class="form-control" type="number" min="1" value="1"></div>
 <div class="col-lg-1 col-md-3 d-flex align-items-end"><button class="btn btn-main w-100" type="submit">+</button></div>
 </form></div>
-<div class="toolbar"><input class="form-control table-search" data-table-filter="#domains" placeholder="جست‌وجوی حوزه..."><span class="form-hint">تعداد: @Model.Count</span></div>
+<div class="toolbar"><form class="toolbar" method="get" action="/Setup/Domains"><input class="form-control" name="q" value="@Model.Search" placeholder="جست‌وجوی حوزه..."><select class="form-select page-size-select" name="pageSize" onchange="this.form.submit()"><option value="25" selected="@(Model.PageSize==25)">25 ردیف</option><option value="50" selected="@(Model.PageSize==50)">50 ردیف</option><option value="75" selected="@(Model.PageSize==75)">75 ردیف</option><option value="100" selected="@(Model.PageSize==100)">100 ردیف</option><button class="btn btn-outline-primary" type="submit">جست‌وجو</button></form><span class="form-hint">تعداد: @Model.TotalCount</span></div>
+@{var totalPages=Math.Max(1,(int)Math.Ceiling(Model.TotalCount/(double)Model.PageSize));}
+@await Html.PartialAsync("_TablePagination",(Model.Page,totalPages,Model.PageSize,Model.Search??"","/Setup/Domains",""))
 <div class="table-panel"><div class="table-responsive"><table id="domains" class="table modern-table"><thead><tr><th>کد</th><th>عنوان</th><th>توضیحات</th><th>ترتیب</th><th>وضعیت</th><th>ویرایش</th><th>عملیات</th></tr></thead><tbody>
-@foreach(var d in Model){<tr><td><span class="code-chip">@d.Code</span></td><td class="fw-bold">@d.Title</td><td class="text-muted">@d.Description</td><td>@d.SortOrder</td><td><span class="status-chip @(d.IsActive?"status-open":"status-closed")">@(d.IsActive?"فعال":"غیرفعال")</span></td>
+@foreach(var d in Model.Rows){<tr><td><span class="code-chip">@d.Code</span></td><td class="fw-bold">@d.Title</td><td class="text-muted">@d.Description</td><td>@d.SortOrder</td><td><span class="status-chip @(d.IsActive?"status-open":"status-closed")">@(d.IsActive?"فعال":"غیرفعال")</span></td>
 <td><form method="post" action="/Setup/EditDomain" class="domain-edit-form">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@d.Id"><input name="code" value="@d.Code" class="form-control"><input name="title" value="@d.Title" class="form-control"><input name="description" value="@d.Description" class="form-control"><input name="sortOrder" type="number" min="1" value="@d.SortOrder" class="form-control"><label class="small"><input type="checkbox" name="isActive" value="true" @(d.IsActive?"checked":"")> فعال</label><button class="btn btn-sm btn-outline-primary">ذخیره</button></form></td>
 <td><form method="post" action="/Setup/ToggleDomain" class="inline-form">@Html.AntiForgeryToken()<input type="hidden" name="id" value="@d.Id"><button class="btn btn-sm btn-outline-secondary">@(d.IsActive?"غیرفعال":"فعال")</button></form></td></tr>}
-</tbody></table></div></div>
+</tbody></table></div>
+@await Html.PartialAsync("_TablePagination",(Model.Page,totalPages,Model.PageSize,Model.Search??"","/Setup/Domains",""))
+</div>
