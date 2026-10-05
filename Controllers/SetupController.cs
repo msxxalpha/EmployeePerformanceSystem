@@ -50,6 +50,7 @@ public class SetupController(AppDbContext db, ExcelService excel) : Controller
             rows,
             await db.Positions.Where(x => x.IsActive).OrderBy(x => x.Title).ToListAsync(),
             await db.EvaluationDomains.Where(x => x.IsActive).OrderBy(x => x.SortOrder).ThenBy(x => x.Title).ToListAsync(),
+            await db.Questions.Where(x => x.IsActive).Include(x => x.EvaluationDomain).OrderBy(x => x.Title).AsNoTracking().ToListAsync(),
             total, page, pageSize, q,
             AutoCodeGenerator.Next(await db.Questions.AsNoTracking().Select(x => x.Code).ToListAsync(), "Q")));
     }
@@ -458,6 +459,7 @@ public class SetupController(AppDbContext db, ExcelService excel) : Controller
         List<Question> Questions,
         List<Position> Positions,
         List<EvaluationDomain> Domains,
+        List<Question> QuestionOptions,
         int TotalCount,
         int Page,
         int PageSize,
