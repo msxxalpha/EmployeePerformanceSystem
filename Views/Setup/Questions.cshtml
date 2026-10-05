@@ -7,7 +7,7 @@
 <div class="form-panel mb-4">
   <div class="panel-title"><div><h4>تعریف سؤال جدید</h4><span>عنوان کوتاه، متن کامل، حوزه ارزیابی و راهنمای ارزیاب را ثبت کنید.</span></div><span class="panel-badge">بانک سؤال</span></div>
   <form method="post" action="/Setup/AddQuestion" class="row g-3">@Html.AntiForgeryToken()
-    <div class="col-lg-2 col-md-4"><label class="form-label">کد سؤال *</label><input name="code" class="form-control" maxlength="50" placeholder="Q-001" required></div>
+    <div class="col-lg-2 col-md-4"><label class="form-label">کد سؤال *</label><input name="code" class="form-control" maxlength="50" value="@Model.NextCode"></div>
     <div class="col-lg-4 col-md-8"><label class="form-label">عنوان سؤال *</label><input name="title" class="form-control" maxlength="250" placeholder="رعایت الزامات کیفیت" required></div>
     <div class="col-lg-3 col-md-6"><label class="form-label">حوزه ارزیابی *</label><select name="domainId" class="form-select" required><option value="">انتخاب حوزه</option>@foreach(var d in Model.Domains){<option value="@d.Id">@d.Code — @d.Title</option>}</select></div>
     <div class="col-lg-3 col-md-6"><label class="form-label">راهنمای ارزیاب</label><input name="description" class="form-control" maxlength="1000" placeholder="راهنمای کوتاه و معیار ارزیابی"></div>
@@ -25,6 +25,8 @@
     <div class="col-lg-1 d-flex align-items-end"><button class="btn btn-main w-100" type="submit">+</button></div>
   </form>
 </div>
-<div class="toolbar"><input class="form-control table-search" data-table-filter="#questions" placeholder="جست‌وجوی کد، عنوان، متن یا حوزه..."><span class="form-hint">تعداد سؤال: @Model.Questions.Count</span></div>
+<div class="toolbar"><form class="toolbar" method="get" action="/Setup/Questions"><input class="form-control" name="q" value="@Model.Search" placeholder="جست‌وجوی کد، عنوان، متن یا حوزه..."><select class="form-select page-size-select" name="pageSize" onchange="this.form.submit()"><option value="25" selected="@(Model.PageSize==25)">25 ردیف</option><option value="50" selected="@(Model.PageSize==50)">50 ردیف</option><option value="75" selected="@(Model.PageSize==75)">75 ردیف</option><option value="100" selected="@(Model.PageSize==100)">100 ردیف</option></select><button class="btn btn-outline-primary" type="submit">جست‌وجو</button></form><span class="form-hint">تعداد سؤال: @Model.TotalCount</span></div>
+@{var totalPages=Math.Max(1,(int)Math.Ceiling(Model.TotalCount/(double)Model.PageSize));}
+@await Html.PartialAsync("_TablePagination",(Model.Page,totalPages,Model.PageSize,Model.Search??"","/Setup/Questions",""))
 <div class="table-panel"><div class="table-responsive"><table id="questions" class="table modern-table"><thead><tr><th>کد</th><th>عنوان / متن</th><th>حوزه</th><th>راهنما</th><th>اتصال‌ها</th><th>رده / سقف</th><th>وضعیت</th></tr></thead><tbody>
 @foreach(var q in Model.Questions){<tr><td><span class="code-chip">@q.Code</span></td><td><b>@q.Title</b><div class="question-desc">@q.Text</div></td><td><span class="domain-chip">@q.EvaluationDomain?.Title</span></td><td class="text-muted">@(q.Description??"—")</td><td>@q.PositionMappings.Count(x=>x.IsActive)</td><td>@if(q.PositionMappings.Any(x=>x.IsActive)){foreach(var m in q.PositionMappings.Where(x=>x.IsActive).OrderBy(x=>x.Position?.Title)){<div class="mapping-line"><span>@m.Position?.Title</span><b>@m.MaxScore.ToString("0.##")</b><form method="post" action="/Setup/RemoveQuestion" class="inline-form">@Html.AntiForgeryToken()<input type="hidden" name="mappingId" value="@m.Id"><button class="link-danger" type="submit">حذف اتصال</button></form></div>}}else{<span class="text-muted">بدون اتصال</span>}</td><td><span class="status-dot @(q.IsActive?"":"off")"></span></td></tr>}</tbody></table></div></div>
