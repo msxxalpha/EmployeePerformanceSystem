@@ -1,6 +1,6 @@
 @model AdminController.PeriodDetailsVm
 @{ViewData["Title"]="جزئیات دوره";}
-<div class="page-header"><div><div class="eyebrow">دوره ارزیابی</div><h2>@Model.Period.Title</h2><p class="text-muted">@Model.Period.StartJalali تا @Model.Period.EndJalali</p></div><div class="toolbar-actions"><a class="btn btn-outline-secondary" href="/Admin/EditPeriod?id=@Model.Period.Id">ویرایش</a><a class="btn btn-outline-primary" href="/Admin/Periods">بازگشت</a></div></div>
+<div class="page-header"><div><div class="eyebrow">دوره ارزیابی</div><h2>@Model.Period.Title</h2><p class="text-muted">@Model.Period.StartJalali تا @Model.Period.EndJalali</p></div><div class="toolbar-actions">@if(!Model.Period.IsDeleted){<a class="btn btn-outline-secondary" href="/Admin/EditPeriod?id=@Model.Period.Id">ویرایش</a>}<a class="btn btn-outline-primary" href="/Admin/Periods">بازگشت</a></div></div>
 <div class="row g-3 mb-4">
 <div class="col-md-4"><div class="metric-card"><span>وضعیت</span><strong>@(Model.Period.IsOpen && Model.Period.EndAt>=DateTime.Now?"فعال":"بسته")</strong><small>بر اساس ساعت سیستم</small></div></div>
 <div class="col-md-4"><div class="metric-card"><span>ارزیابی‌های ثبت‌شده</span><strong>@Model.Evaluations.Count</strong><small>در این دوره</small></div></div>
