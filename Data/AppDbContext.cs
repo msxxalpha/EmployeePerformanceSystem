@@ -42,6 +42,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         b.Entity<EvaluationDomain>().Property(x => x.Code).HasMaxLength(50);
         b.Entity<EvaluationDomain>().Property(x => x.Title).HasMaxLength(200);
         b.Entity<EvaluationDomain>().Property(x => x.SortOrder).IsRequired();
+        b.Entity<EvaluationPeriod>().Property(x => x.IsDeleted).IsRequired();
+        b.Entity<EvaluationPeriod>().Property(x => x.DeletedAt);
 
         b.Entity<AppUser>()
             .HasOne<Employee>().WithMany()
