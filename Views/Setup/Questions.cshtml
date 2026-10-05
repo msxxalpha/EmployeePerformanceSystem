@@ -18,7 +18,7 @@
 <div class="table-panel mb-4">
   <div class="panel-title"><div><h4>اتصال سؤال به رده پستی</h4><span>سقف امتیاز این اتصال در زمان ثبت و در سمت سرور کنترل می‌شود.</span></div><span class="panel-badge">اختصاصی برای هر رده</span></div>
   <form method="post" action="/Setup/AssignQuestion" class="row g-3">@Html.AntiForgeryToken()
-    <div class="col-lg-4"><label class="form-label">سؤال *</label><select name="questionId" class="form-select" required><option value="">انتخاب سؤال</option>@foreach(var q in Model.Questions.Where(x=>x.IsActive)){<option value="@q.Id">@q.Code — @q.Title</option>}</select></div>
+    <div class="col-lg-4"><label class="form-label">سؤال *</label><select name="questionId" class="form-select" required><option value="">انتخاب سؤال</option>@foreach(var q in Model.QuestionOptions){<option value="@q.Id">@q.Code — @q.Title</option>}</select></div>
     <div class="col-lg-3"><label class="form-label">رده پستی *</label><select name="positionId" class="form-select" required><option value="">انتخاب رده</option>@foreach(var p in Model.Positions.Where(x=>x.IsActive)){<option value="@p.Id">@p.Code — @p.Title</option>}</select></div>
     <div class="col-lg-2"><label class="form-label">سقف امتیاز *</label><input name="maxScore" class="form-control" type="number" min=".01" step=".01" required></div>
     <div class="col-lg-2"><label class="form-label">ترتیب</label><input name="sortOrder" class="form-control" type="number" min="1" value="1"></div>
