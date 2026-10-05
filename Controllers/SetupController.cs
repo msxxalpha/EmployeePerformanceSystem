@@ -151,13 +151,16 @@ public class SetupController(AppDbContext db, ExcelService excel) : Controller
             var map = await db.PositionQuestions.SingleOrDefaultAsync(x => x.QuestionId == questionId && x.PositionId == positionId);
 
             if (map == null)
+            {
                 db.PositionQuestions.Add(new PositionQuestion
                 {
                     QuestionId = questionId,
                     PositionId = positionId,
                     MaxScore = maxScore,
-                    SortOrder = Math.Max(1, sortOrder)
+                    SortOrder = Math.Max(1, sortOrder),
+                    IsActive = true
                 });
+            }
             else
             {
                 map.MaxScore = maxScore;
@@ -165,36 +168,70 @@ public class SetupController(AppDbContext db, ExcelService excel) : Controller
                 map.IsActive = true;
             }
 
-            p.MaxScore = await db.PositionQuestions
-                .Where(x => x.PositionId == positionId && x.IsActive)
-                .SumAsync(x => x.MaxScore);
-
             await db.SaveChangesAsync();
-            TempData["Result"] = "سؤال با موفقیت به رده پستی متصل شد.";
+            await RecalculatePositionMaxScore(positionId);
+            TempData["Result"] = "سؤال با موفقیت به رده پستی اضافه یا مجدداً فعال شد.";
         }
 
-        return RedirectToAction(nameof(Questions));
+        return RedirectToAction(nameof(Positions));
+    }
+
+    [HttpPost, ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateQuestionMapping(int mappingId, decimal maxScore, int sortOrder = 1)
+    {
+        var map = await db.PositionQuestions.SingleOrDefaultAsync(x => x.Id == mappingId);
+        if (map == null) return NotFound();
+
+        if (maxScore <= 0)
+        {
+            TempData["Error"] = "سقف امتیاز باید بیشتر از صفر باشد.";
+            return RedirectToAction(nameof(Positions));
+        }
+
+        if (!await db.Questions.AnyAsync(x => x.Id == map.QuestionId && x.IsActive) ||
+            !await db.Positions.AnyAsync(x => x.Id == map.PositionId && x.IsActive))
+        {
+            TempData["Error"] = "سؤال یا رده پستی غیرفعال است.";
+            return RedirectToAction(nameof(Positions));
+        }
+
+        map.MaxScore = maxScore;
+        map.SortOrder = Math.Max(1, sortOrder);
+        map.IsActive = true;
+        await db.SaveChangesAsync();
+        await RecalculatePositionMaxScore(map.PositionId);
+        TempData["Result"] = "سقف امتیاز و ترتیب سؤال در رده پستی به‌روزرسانی شد.";
+        return RedirectToAction(nameof(Positions));
     }
 
     [HttpPost, ValidateAntiForgeryToken]
     public async Task<IActionResult> RemoveQuestion(int mappingId)
     {
-        var map = await db.PositionQuestions.Include(x => x.Position)
-            .SingleOrDefaultAsync(x => x.Id == mappingId);
-
+        var map = await db.PositionQuestions.SingleOrDefaultAsync(x => x.Id == mappingId);
         if (map == null)
             TempData["Error"] = "اتصال سؤال پیدا نشد.";
         else
         {
             map.IsActive = false;
-            map.Position!.MaxScore = await db.PositionQuestions
-                .Where(x => x.PositionId == map.PositionId && x.IsActive && x.Id != map.Id)
-                .SumAsync(x => x.MaxScore);
             await db.SaveChangesAsync();
-            TempData["Result"] = "اتصال سؤال غیرفعال شد.";
+            await RecalculatePositionMaxScore(map.PositionId);
+            TempData["Result"] = "اتصال سؤال از این رده پستی حذف شد.";
         }
 
-        return RedirectToAction(nameof(Questions));
+        return RedirectToAction(nameof(Positions));
+    }
+
+    private async Task RecalculatePositionMaxScore(int positionId)
+    {
+        var position = await db.Positions.FindAsync(positionId);
+        if (position == null) return;
+
+        position.MaxScore = await db.PositionQuestions
+            .Where(x => x.PositionId == positionId && x.IsActive &&
+                        x.Question != null && x.Question.IsActive)
+            .SumAsync(x => x.MaxScore);
+
+        await db.SaveChangesAsync();
     }
 
     public async Task<IActionResult> OrgUnits() =>
