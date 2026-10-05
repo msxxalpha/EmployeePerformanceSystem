@@ -3,7 +3,7 @@
 <div class="page-header"><div><div class="eyebrow">اطلاعات پایه</div><h2>حوزه‌های ارزیابی</h2><p class="text-muted">حوزه‌ها به صورت آیتم‌های استاندارد تعریف می‌شوند و هنگام ایجاد سؤال از این فهرست انتخاب می‌شوند.</p></div><a class="btn btn-outline-primary" href="/Setup/Questions">بانک سؤالات</a></div>
 <div class="form-panel mb-4"><div class="panel-title"><div><h4>افزودن حوزه ارزیابی</h4><span>کد، عنوان، توضیحات و ترتیب نمایش را مشخص کنید.</span></div><span class="panel-badge">اطلاعات پایه</span></div>
 <form method="post" action="/Setup/AddDomain" class="row g-3">@Html.AntiForgeryToken()
-<div class="col-lg-2 col-md-4"><label class="form-label">کد *</label><input name="code" class="form-control" placeholder="DOM-01" maxlength="50" required></div>
+<div class="col-lg-2 col-md-4"><label class="form-label">کد *</label><input name="code" class="form-control" placeholder="DOM-001" value="@Model.NextCode" maxlength="50"></div>
 <div class="col-lg-4 col-md-8"><label class="form-label">عنوان *</label><input name="title" class="form-control" placeholder="کیفیت" maxlength="200" required></div>
 <div class="col-lg-4 col-md-6"><label class="form-label">توضیحات</label><input name="description" class="form-control"></div>
 <div class="col-lg-1 col-md-3"><label class="form-label">ترتیب</label><input name="sortOrder" class="form-control" type="number" min="1" value="1"></div>
